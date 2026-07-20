@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -23,14 +23,11 @@ const NotFound = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const handleRefresh = () => {
-        setIsRotating(true);
-        setTimeout(() => setIsRotating(false), 1000);
-    };
+
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4 py-20 relative overflow-hidden">
-            {/* ===== ডেকোরেটিভ এলিমেন্টস ===== */}
+    
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-96 h-96 bg-gradient-to-br from-indigo-200/30 to-purple-200/30 rounded-full blur-3xl animate-pulse" />
                 <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-gradient-to-tr from-purple-200/30 to-pink-200/30 rounded-full blur-3xl animate-pulse delay-1000" />
