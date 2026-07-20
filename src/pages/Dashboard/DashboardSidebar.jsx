@@ -18,8 +18,8 @@ const DashboardSidebar = () => {
 
     const menuItems = [
         { path: '/dashboard', name: 'Overview', icon: FiHome },
-        { path: '/dashboard/analytics', name: 'Analytics', icon: FiPieChart },
-        { path: '/dashboard/management', name: 'Management', icon: FiGrid },
+        { path: '/dashboard/add-application', name: 'Add Application', icon: FiPieChart },
+        { path: '/dashboard/all-applications', name: 'All Applications', icon: FiGrid },
         { path: '/dashboard/riders', name: 'Riders', icon: FiUsers },
         { path: '/dashboard/settings', name: 'Settings', icon: FiSettings },
     ];

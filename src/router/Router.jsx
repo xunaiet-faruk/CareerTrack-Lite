@@ -6,6 +6,8 @@ import Register from "../pages/Authentication/Register";
 import Login from "../pages/Authentication/Login";
 import DashboardLayout from "../pages/Dashboard/DashboardLayout";
 import DashboardHome from "../pages/Dashboard/DashboardHome";
+import AddApplication from "../pages/Dashboard/AddApplication";
+import AllApplication from "../pages/Dashboard/DashboardRoutes/AllApplication";
 
 
 export const router = createBrowserRouter([
@@ -36,6 +38,14 @@ export const router = createBrowserRouter([
         index: true,
         element: <DashboardHome />,
       },
+      {
+        path: "add-application",
+        element : <AddApplication/>
+      },
+      {
+        path: "all-applications",
+        element : <AllApplication/>
+      }
     ],
   },
     
