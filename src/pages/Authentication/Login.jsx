@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -7,17 +7,20 @@ import {
     FiEye, 
     FiEyeOff, 
     FiArrowRight,
-    FiCheckCircle,
     FiAlertCircle,
     FiGithub,
-    FiTwitter,
     FiLinkedin
 } from 'react-icons/fi';
+import LoadingSpinner from '../../component/shared/LoadingSpinner';
+import { Authcontext } from '../../context/Authprovider';
 
 const Login = () => {
     const navigate = useNavigate();
+    const { signInUser, googleSignIn, setLoading } = useContext(Authcontext);
+    
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -31,7 +34,6 @@ const Login = () => {
             ...prev,
             [name]: value
         }));
-        // ক্লিয়ার এরর
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
@@ -58,18 +60,53 @@ const Login = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError('');
+
         if (!validate()) return;
 
         setIsLoading(true);
-        setTimeout(() => {
-            setIsLoading(false);
+        setLoading(true);
+
+        try {
+            await signInUser(formData.email, formData.password);
             navigate('/dashboard');
-        }, 1500);
+        } catch (err) {
+            console.error(err);
+            if (err.code === 'auth/user-not-found') {
+                setError('No account found with this email.');
+            } else if (err.code === 'auth/wrong-password') {
+                setError('Incorrect password. Please try again.');
+            } else if (err.code === 'auth/too-many-requests') {
+                setError('Too many failed attempts. Please try again later.');
+            } else {
+                setError('Login failed. Please try again.');
+            }
+        } finally {
+            setIsLoading(false);
+            setLoading(false);
+        }
+    };
+
+    // গুগল দিয়ে লগইন
+    const handleGoogleSignIn = async () => {
+        setError('');
+        setIsLoading(true);
+        setLoading(true);
+
+        try {
+            await googleSignIn();
+            navigate('/dashboard');
+        } catch (err) {
+            console.error(err);
+            setError('Google sign in failed. Please try again.');
+        } finally {
+            setIsLoading(false);
+            setLoading(false);
+        }
     };
 
     return (
         <div className="flex items-center justify-center px-4 py-20 bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative overflow-hidden">
-        
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-96 h-96 bg-gradient-to-br from-indigo-200/30 to-purple-200/30 rounded-full blur-3xl animate-pulse" />
                 <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-gradient-to-tr from-purple-200/30 to-pink-200/30 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -79,7 +116,6 @@ const Login = () => {
                 }} />
             </div>
 
-       
             <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -87,7 +123,7 @@ const Login = () => {
                 className="relative z-10 w-full max-w-[500px]"
             >
                 <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8 sm:p-10">
-                    {/* ===== হেডার ===== */}
+                    {/* হেডার */}
                     <div className="text-center mb-8">
                         <motion.div
                             initial={{ scale: 0 }}
@@ -105,7 +141,19 @@ const Login = () => {
                         </p>
                     </div>
 
-                    {/* ===== ফর্ম ===== */}
+                    {/* Error Message */}
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-600"
+                        >
+                            <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <p className="text-sm">{error}</p>
+                        </motion.div>
+                    )}
+
+                    {/* ফর্ম */}
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* ইমেইল ফিল্ড */}
                         <div>
@@ -137,14 +185,8 @@ const Login = () => {
                             )}
                         </div>
 
-                        {/* পাসওয়ার্ড ফিল্ড */}
                         <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Password
-                                </label>
-                              
-                            </div>
+                          
                             <div className="relative">
                                 <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                                 <input
@@ -178,7 +220,7 @@ const Login = () => {
                         </div>
 
                         {/* রিমেম্বার মি */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center">
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -198,10 +240,7 @@ const Login = () => {
                         >
                             {isLoading ? (
                                 <>
-                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                    </svg>
+                                    <LoadingSpinner size="sm" color="white" />
                                     Signing In...
                                 </>
                             ) : (
@@ -213,7 +252,7 @@ const Login = () => {
                         </button>
                     </form>
 
-                    {/* ===== অল্টারনেটিভ লগইন ===== */}
+                    {/* অল্টারনেটিভ লগইন */}
                     <div className="mt-8">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
@@ -224,8 +263,12 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3 mt-6">
-                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105">
+                        <div className=" mt-6">
+                            <button 
+                                onClick={handleGoogleSignIn}
+                                disabled={isLoading}
+                                className="flex w-full cursor-pointer items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105 disabled:opacity-50"
+                            >
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
                                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -234,18 +277,11 @@ const Login = () => {
                                 </svg>
                                 <span className="text-sm font-medium text-gray-700 hidden sm:inline">Google</span>
                             </button>
-                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105">
-                                <FiGithub className="w-5 h-5" />
-                                <span className="text-sm font-medium text-gray-700 hidden sm:inline">GitHub</span>
-                            </button>
-                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105">
-                                <FiLinkedin className="w-5 h-5" />
-                                <span className="text-sm font-medium text-gray-700 hidden sm:inline">LinkedIn</span>
-                            </button>
+                           
                         </div>
                     </div>
 
-                    {/* ===== রেজিস্টার লিংক ===== */}
+                    {/* রেজিস্টার লিংক */}
                     <div className="text-center mt-8 pt-6 border-t border-gray-200">
                         <p className="text-gray-600">
                             Don't have an account?{' '}
@@ -255,8 +291,6 @@ const Login = () => {
                         </p>
                     </div>
                 </div>
-
-            
             </motion.div>
         </div>
     );

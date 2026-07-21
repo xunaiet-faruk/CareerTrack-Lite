@@ -1,7 +1,11 @@
-import  { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import SuccessMessage from './../../component/shared/SuccessMessage';
+import ErrorMessage from './../../component/shared/ErrorMessage';
+import LoadingSpinner from './../../component/shared/LoadingSpinner';
 import { 
+
     FiUser, 
     FiMail, 
     FiLock, 
@@ -9,17 +13,15 @@ import {
     FiEyeOff, 
     FiArrowRight,
     FiAlertCircle,
-
     FiGithub,
     FiLinkedin
 } from 'react-icons/fi';
-import ErrorMessage from '../../component/shared/ErrorMessage';
-import SuccessMessage from '../../component/shared/SuccessMessage';
-import LoadingSpinner from '../../component/shared/LoadingSpinner';
-;
+import { Authcontext } from '../../context/Authprovider';
 
 const Register = () => {
     const navigate = useNavigate();
+    const { createUser, updateUserProfile, googleSignIn, setLoading } = useContext(Authcontext);
+    
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -127,20 +129,60 @@ const Register = () => {
         if (!validate()) return;
 
         setIsLoading(true);
-        
-        // TODO: API কল করবে
-        setTimeout(() => {
-            setIsLoading(false);
+        setLoading(true);
+
+        try {
+            // ১. ইউজার তৈরি করুন
+            const result = await createUser(formData.email, formData.password);
+            
+            // ২. প্রোফাইল আপডেট করুন (নাম)
+            await updateUserProfile(formData.fullName, '');
+            
             setSuccess('Account created successfully! Redirecting...');
+            
             setTimeout(() => {
                 navigate('/login');
             }, 1500);
-        }, 2000);
+        } catch (err) {
+            console.error(err);
+            if (err.code === 'auth/email-already-in-use') {
+                setError('This email is already registered. Please login.');
+            } else if (err.code === 'auth/weak-password') {
+                setError('Password should be at least 6 characters.');
+            } else {
+                setError('Something went wrong. Please try again.');
+            }
+        } finally {
+            setIsLoading(false);
+            setLoading(false);
+        }
+    };
+
+    // গুগল দিয়ে রেজিস্ট্রেশন
+    const handleGoogleSignIn = async () => {
+        setError('');
+        setSuccess('');
+        setIsLoading(true);
+        setLoading(true);
+
+        try {
+            await googleSignIn();
+            setSuccess('Registration successful!');
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 1500);
+        } catch (err) {
+            console.error(err);
+            setError('Google sign in failed. Please try again.');
+        } finally {
+            setIsLoading(false);
+            setLoading(false);
+        }
     };
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative overflow-hidden">
-            {/* ===== ডেকোরেটিভ এলিমেন্টস ===== */}
+            {/* ডেকোরেটিভ এলিমেন্টস */}
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-96 h-96 bg-gradient-to-br from-indigo-200/30 to-purple-200/30 rounded-full blur-3xl animate-pulse" />
                 <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-gradient-to-tr from-purple-200/30 to-pink-200/30 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -150,7 +192,7 @@ const Register = () => {
                 }} />
             </div>
 
-            {/* ===== মেইন কার্ড ===== */}
+            {/* মেইন কার্ড */}
             <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -158,7 +200,7 @@ const Register = () => {
                 className="relative z-10 w-full max-w-[530px]"
             >
                 <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8 sm:p-10">
-                    {/* ===== হেডার ===== */}
+                    {/* হেডার */}
                     <div className="text-center mb-8">
                         <motion.div
                             initial={{ scale: 0 }}
@@ -176,7 +218,7 @@ const Register = () => {
                         </p>
                     </div>
 
-                    {/* ===== মেসেজ ===== */}
+                    {/* মেসেজ */}
                     <AnimatePresence mode="wait">
                         {error && (
                             <motion.div
@@ -200,7 +242,7 @@ const Register = () => {
                         )}
                     </AnimatePresence>
 
-                    {/* ===== ফর্ম ===== */}
+                    {/* ফর্ম */}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* ফুল নেম */}
                         <div>
@@ -378,7 +420,7 @@ const Register = () => {
                         </button>
                     </form>
 
-                    {/* ===== অল্টারনেটিভ রেজিস্টার ===== */}
+                    {/* অল্টারনেটিভ রেজিস্টার */}
                     <div className="mt-8">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
@@ -389,8 +431,12 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3 mt-6">
-                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105">
+                        <div className=" mt-6">
+                            <button 
+                                onClick={handleGoogleSignIn}
+                                disabled={isLoading}
+                                className="flex items-center w-full cursor-pointer justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105 disabled:opacity-50"
+                            >
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
                                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -399,18 +445,11 @@ const Register = () => {
                                 </svg>
                                 <span className="text-sm font-medium text-gray-700 hidden sm:inline">Google</span>
                             </button>
-                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105">
-                                <FiGithub className="w-5 h-5" />
-                                <span className="text-sm font-medium text-gray-700 hidden sm:inline">GitHub</span>
-                            </button>
-                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105">
-                                <FiLinkedin className="w-5 h-5" />
-                                <span className="text-sm font-medium text-gray-700 hidden sm:inline">LinkedIn</span>
-                            </button>
+                       
                         </div>
                     </div>
 
-                    {/* ===== লগইন লিংক ===== */}
+                    {/* লগইন লিংক */}
                     <div className="text-center mt-8 pt-6 border-t border-gray-200">
                         <p className="text-gray-600">
                             Already have an account?{' '}
@@ -420,8 +459,6 @@ const Register = () => {
                         </p>
                     </div>
                 </div>
-
-        
             </motion.div>
         </div>
     );
