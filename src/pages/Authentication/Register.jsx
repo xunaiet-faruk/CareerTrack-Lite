@@ -132,16 +132,14 @@ const Register = () => {
         setLoading(true);
 
         try {
-            // ১. ইউজার তৈরি করুন
             const result = await createUser(formData.email, formData.password);
             
-            // ২. প্রোফাইল আপডেট করুন (নাম)
             await updateUserProfile(formData.fullName, '');
             
             setSuccess('Account created successfully! Redirecting...');
             
             setTimeout(() => {
-                navigate('/login');
+                navigate('/dashboard');
             }, 1500);
         } catch (err) {
             console.error(err);
@@ -206,7 +204,7 @@ const Register = () => {
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{ duration: 0.5, type: "spring", stiffness: 200 }}
-                            className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-300/50"
+                            className="w-20  h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-300/50"
                         >
                             <span className="text-4xl">🚀</span>
                         </motion.div>
@@ -404,7 +402,7 @@ const Register = () => {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:shadow-indigo-300/50 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className=" cursor-pointer w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:shadow-indigo-300/50 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
                                 <>

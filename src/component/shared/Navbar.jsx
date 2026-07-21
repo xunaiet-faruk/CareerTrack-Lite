@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
     FiUser, 
     FiLogOut, 
@@ -48,7 +48,37 @@ const Navbar = () => {
         }
     };
 
-    // ইউজারের ইনিশিয়াল (প্রথম অক্ষর)
+    const smoothScroll = (e, targetId) => {
+        e.preventDefault();
+        const target = document.getElementById(targetId);
+        if (target) {
+            const offset = 80;
+            const elementPosition = target.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+        closeMenu();
+        setIsDropdownOpen(false);
+    };
+
+    const navigateToHome = (e) => {
+        e.preventDefault();
+        closeMenu();
+        setIsDropdownOpen(false);
+        if (window.location.pathname === '/') {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        } else {
+            navigate('/');
+        }
+    };
+
     const getUserInitial = () => {
         if (user?.displayName) {
             return user.displayName.charAt(0).toUpperCase();
@@ -59,7 +89,6 @@ const Navbar = () => {
         return 'U';
     };
 
-    // ইউজারের সম্পূর্ণ নাম
     const getUserName = () => {
         if (user?.displayName) {
             return user.displayName;
@@ -70,15 +99,20 @@ const Navbar = () => {
         return 'User';
     };
 
-    // ইউজারের ইমেইল
     const getUserEmail = () => {
         return user?.email || '';
     };
 
-    // প্রোফাইল ফটো
     const getProfilePhoto = () => {
         return user?.photoURL || null;
     };
+
+    const navItems = [
+        { id: 'banner', label: 'Home', icon: FiHome, isHome: true },
+        { id: 'features', label: 'Features', icon: FiInfo },
+        { id: 'how-it-works', label: 'How It Works', icon: FiBriefcase },
+        { id: 'testimonials', label: 'Testimonials', icon: FiMail },
+    ];
 
     return (
         <nav 
@@ -94,11 +128,9 @@ const Navbar = () => {
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between">
                     
-                    {/* ===== লোগো ===== */}
-                    <Link 
-                        to="/" 
-                        className="flex items-center gap-2 group"
-                        onClick={closeMenu}
+                    <button
+                        onClick={navigateToHome}
+                        className="flex items-center gap-2 group cursor-pointer"
                     >
                         <span className="text-3xl transition-transform group-hover:scale-110 duration-300">
                             🚀
@@ -115,62 +147,40 @@ const Navbar = () => {
                                 Lite
                             </span>
                         </span>
-                    </Link>
+                    </button>
 
-                    {/* ===== ডেস্কটপ নেভ লিংকস ===== */}
                     <div className="hidden md:flex items-center gap-1">
-                        <NavLink 
-                            to="/" 
-                            className={({ isActive }) => `
-                                px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2
-                                ${isActive 
-                                    ? 'text-indigo-600 bg-indigo-50' 
-                                    : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                                }
-                            `}
-                        >
-                            <FiHome className="w-4 h-4" />
-                            Home
-                        </NavLink>
-                        <NavLink 
-                            to="/about" 
-                            className={({ isActive }) => `
-                                px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2
-                                ${isActive 
-                                    ? 'text-indigo-600 bg-indigo-50' 
-                                    : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                                }
-                            `}
-                        >
-                            <FiInfo className="w-4 h-4" />
-                            About
-                        </NavLink>
-                        <NavLink 
-                            to="/services" 
-                            className={({ isActive }) => `
-                                px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2
-                                ${isActive 
-                                    ? 'text-indigo-600 bg-indigo-50' 
-                                    : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                                }
-                            `}
-                        >
-                            <FiBriefcase className="w-4 h-4" />
-                            Services
-                        </NavLink>
-                        <NavLink 
-                            to="/contact" 
-                            className={({ isActive }) => `
-                                px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2
-                                ${isActive 
-                                    ? 'text-indigo-600 bg-indigo-50' 
-                                    : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                                }
-                            `}
-                        >
-                            <FiMail className="w-4 h-4" />
-                            Contact
-                        </NavLink>
+                        {navItems.map((item) => {
+                            const Icon = item.icon;
+                            if (item.isHome) {
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={navigateToHome}
+                                        className={`
+                                            px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2 cursor-pointer
+                                            text-gray-600 hover:text-indigo-600 hover:bg-indigo-50
+                                        `}
+                                    >
+                                        <Icon className="w-4 h-4" />
+                                        {item.label}
+                                    </button>
+                                );
+                            }
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={(e) => smoothScroll(e, item.id)}
+                                    className={`
+                                        px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2 cursor-pointer
+                                        text-gray-600 hover:text-indigo-600 hover:bg-indigo-50
+                                    `}
+                                >
+                                    <Icon className="w-4 h-4" />
+                                    {item.label}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     <div className="hidden md:flex items-center gap-3">
@@ -182,7 +192,6 @@ const Navbar = () => {
                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                     className="flex cursor-pointer items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all duration-300 group"
                                 >
-                                    {/* অ্যাভাটার */}
                                     <div className="relative">
                                         {getProfilePhoto() ? (
                                             <img
@@ -195,7 +204,6 @@ const Navbar = () => {
                                                 {getUserInitial()}
                                             </div>
                                         )}
-                                        {/* অনলাইন স্ট্যাটাস ডট */}
                                         <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
                                     </div>
                                     
@@ -214,18 +222,14 @@ const Navbar = () => {
                                     `} />
                                 </button>
 
-                                {/* ===== ড্রপডাউন মেনু ===== */}
                                 {isDropdownOpen && (
                                     <>
-                                        {/* ওভারলে */}
                                         <div 
                                             className="fixed inset-0 z-40"
                                             onClick={() => setIsDropdownOpen(false)}
                                         ></div>
                                         
-                                        {/* ড্রপডাউন */}
                                         <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-slideDown">
-                                            {/* প্রোফাইল হেডার */}
                                             <div className="px-4 py-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
                                                 <div className="flex items-center gap-3">
                                                     {getProfilePhoto() ? (
@@ -250,7 +254,6 @@ const Navbar = () => {
                                                 </div>
                                             </div>
 
-                                            {/* মেনু আইটেম */}
                                             <div className="p-2">
                                                 <Link
                                                     to="/dashboard"
@@ -269,48 +272,6 @@ const Navbar = () => {
                                                         </p>
                                                         <p className="text-xs text-gray-500">
                                                             Manage your applications
-                                                        </p>
-                                                    </div>
-                                                </Link>
-
-                                                <Link
-                                                    to="/profile"
-                                                    onClick={() => {
-                                                        setIsDropdownOpen(false);
-                                                        closeMenu();
-                                                    }}
-                                                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 transition-all duration-300 group"
-                                                >
-                                                    <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 group-hover:bg-purple-200 transition-colors">
-                                                        <FiUser className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-gray-800">
-                                                            Profile
-                                                        </p>
-                                                        <p className="text-xs text-gray-500">
-                                                            View your profile
-                                                        </p>
-                                                    </div>
-                                                </Link>
-
-                                                <Link
-                                                    to="/settings"
-                                                    onClick={() => {
-                                                        setIsDropdownOpen(false);
-                                                        closeMenu();
-                                                    }}
-                                                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 transition-all duration-300 group"
-                                                >
-                                                    <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 group-hover:bg-gray-200 transition-colors">
-                                                        <FiSettings className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-gray-800">
-                                                            Settings
-                                                        </p>
-                                                        <p className="text-xs text-gray-500">
-                                                            Account preferences
                                                         </p>
                                                     </div>
                                                 </Link>
@@ -339,7 +300,6 @@ const Navbar = () => {
                                 )}
                             </div>
                         ) : (
-                            // ❌ ইউজার লগইন না থাকলে - লগইন বাটন
                             <Link 
                                 to="/login" 
                                 className={`
@@ -358,7 +318,6 @@ const Navbar = () => {
                         )}
                     </div>
 
-                    {/* ===== হ্যামবার্গার বাটন (মোবাইল) ===== */}
                     <button 
                         onClick={toggleMenu}
                         className="md:hidden flex flex-col gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -380,14 +339,12 @@ const Navbar = () => {
                 </div>
             </div>
 
-            {/* ===== মোবাইল মেনু (স্লাইড) ===== */}
             <div className={`
                 md:hidden fixed top-0 right-0 h-full w-72 
                 bg-white shadow-2xl
                 transition-all duration-400 ease-in-out
                 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}
             `}>
-                {/* মোবাইল মেনু হেডার */}
                 <div className="flex items-center justify-between p-6 border-b">
                     <span className="text-xl font-bold text-gray-800">
                         Career<span className="text-indigo-600">Track</span>Lite
@@ -402,7 +359,6 @@ const Navbar = () => {
                     </button>
                 </div>
 
-                {/* মোবাইলে ইউজার প্রোফাইল */}
                 {user && (
                     <div className="px-6 py-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
                         <div className="flex items-center gap-3">
@@ -429,84 +385,50 @@ const Navbar = () => {
                     </div>
                 )}
 
-                {/* মোবাইল মেনু লিংকস */}
                 <div className="p-6 space-y-2">
-                    <NavLink 
-                        to="/" 
-                        className={({ isActive }) => `
-                            block px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3
-                            ${isActive 
-                                ? 'text-indigo-600 bg-indigo-50' 
-                                : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                            }
-                        `}
-                        onClick={closeMenu}
-                    >
-                        <FiHome className="w-5 h-5" />
-                        Home
-                    </NavLink>
-                    <NavLink 
-                        to="/about" 
-                        className={({ isActive }) => `
-                            block px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3
-                            ${isActive 
-                                ? 'text-indigo-600 bg-indigo-50' 
-                                : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                            }
-                        `}
-                        onClick={closeMenu}
-                    >
-                        <FiInfo className="w-5 h-5" />
-                        About
-                    </NavLink>
-                    <NavLink 
-                        to="/services" 
-                        className={({ isActive }) => `
-                            block px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3
-                            ${isActive 
-                                ? 'text-indigo-600 bg-indigo-50' 
-                                : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                            }
-                        `}
-                        onClick={closeMenu}
-                    >
-                        <FiBriefcase className="w-5 h-5" />
-                        Services
-                    </NavLink>
-                    <NavLink 
-                        to="/contact" 
-                        className={({ isActive }) => `
-                            block px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3
-                            ${isActive 
-                                ? 'text-indigo-600 bg-indigo-50' 
-                                : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                            }
-                        `}
-                        onClick={closeMenu}
-                    >
-                        <FiMail className="w-5 h-5" />
-                        Contact
-                    </NavLink>
+                    {navItems.map((item) => {
+                        const Icon = item.icon;
+                        if (item.isHome) {
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={navigateToHome}
+                                    className={`
+                                        block w-full text-left px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3 cursor-pointer
+                                        text-gray-600 hover:text-indigo-600 hover:bg-indigo-50
+                                    `}
+                                >
+                                    <Icon className="w-5 h-5" />
+                                    {item.label}
+                                </button>
+                            );
+                        }
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={(e) => smoothScroll(e, item.id)}
+                                className={`
+                                    block w-full text-left px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3 cursor-pointer
+                                    text-gray-600 hover:text-indigo-600 hover:bg-indigo-50
+                                `}
+                            >
+                                <Icon className="w-5 h-5" />
+                                {item.label}
+                            </button>
+                        );
+                    })}
 
-                    {/* মোবাইলে ড্যাশবোর্ড (লগইন থাকলে) */}
                     {user && (
-                        <NavLink 
+                        <Link 
                             to="/dashboard" 
-                            className={({ isActive }) => `
-                                block px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3
-                                ${isActive 
-                                    ? 'text-indigo-600 bg-indigo-50' 
-                                    : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                                }
-                            `}
+                            className="block px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 flex items-center gap-3 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50"
                             onClick={closeMenu}
                         >
                             <FiLayout className="w-5 h-5" />
                             Dashboard
-                        </NavLink>
+                        </Link>
                     )}
 
-                    {/* মোবাইলে লগইন/লগআউট বাটন */}
                     <div className="pt-4 mt-4 border-t">
                         {user ? (
                             <button 
@@ -532,7 +454,6 @@ const Navbar = () => {
                 </div>
             </div>
 
-            {/* মোবাইল মেনু ওভারলে */}
             {isMenuOpen && (
                 <div 
                     className="md:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-[-1]"
@@ -540,7 +461,6 @@ const Navbar = () => {
                 ></div>
             )}
 
-            {/* ===== ড্রপডাউন অ্যানিমেশন CSS ===== */}
             <style jsx>{`
                 @keyframes slideDown {
                     from {

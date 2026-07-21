@@ -8,6 +8,11 @@ import DashboardLayout from "../pages/Dashboard/DashboardLayout";
 import DashboardHome from "../pages/Dashboard/DashboardHome";
 import AddApplication from "../pages/Dashboard/AddApplication";
 import AllApplication from "../pages/Dashboard/DashboardRoutes/AllApplication";
+import Analytics from "../pages/Dashboard/DashboardRoutes/Analytics";
+import Interview from "../pages/Dashboard/DashboardRoutes/Interview";
+import Applied from "../pages/Dashboard/DashboardRoutes/Applied";
+import Setting from "../pages/Dashboard/DashboardRoutes/Setting";
+import ProtectedRoute from "./ProtectedRoute";
 
 
 export const router = createBrowserRouter([
@@ -32,7 +37,11 @@ export const router = createBrowserRouter([
     },
      {
     path: "/dashboard",
-    element: <DashboardLayout />,
+      element: (
+            <ProtectedRoute>
+                <DashboardLayout />
+            </ProtectedRoute>
+        ),
     children: [
       {
         index: true,
@@ -45,6 +54,22 @@ export const router = createBrowserRouter([
       {
         path: "all-applications",
         element : <AllApplication/>
+      },
+      {
+        path: "analytics",
+        element : <Analytics/>
+      },
+      {
+        path: "interview",
+        element : <Interview/>
+      },
+      {
+        path: "applied",
+        element : <Applied/>
+      },
+      {
+        path: "settings",
+        element : <Setting/>    
       }
     ],
   },

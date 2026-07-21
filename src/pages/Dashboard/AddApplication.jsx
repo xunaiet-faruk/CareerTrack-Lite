@@ -60,7 +60,7 @@ const AddApplication = () => {
         };
 
         try {
-            const res = await axios.post('/applications', applicationData);
+            const res = await axios.post('/application', applicationData);
             
             if (res.data) {
                 toast.success('🎉 Application added successfully!', {

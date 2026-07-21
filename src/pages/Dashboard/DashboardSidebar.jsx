@@ -55,8 +55,6 @@ const DashboardSidebar = () => {
         { path: '/dashboard/all-applications', name: 'All Applications', icon: FiGrid, emoji: '📋' },
         { path: '/dashboard/applied', name: 'Applied', icon: FiFileText, emoji: '📤' },
         { path: '/dashboard/interview', name: 'Interview', icon: FiUsers, emoji: '🎯' },
-        { path: '/dashboard/offers', name: 'Offers', icon: FiCheckCircle, emoji: '🎉' },
-        { path: '/dashboard/rejected', name: 'Rejected', icon: FiClock, emoji: '❌' },
         { path: '/dashboard/analytics', name: 'Analytics', icon: FiBarChart2, emoji: '📈' },
         { path: '/dashboard/settings', name: 'Settings', icon: FiSettings, emoji: '⚙️' },
     ];
