@@ -11,7 +11,8 @@ import {
     FiCalendar, 
     FiFileText,
     FiPlusCircle,
-    FiCheck
+    FiCheck,
+    FiCode
 } from 'react-icons/fi';
 import { Authcontext } from '../../context/Authprovider';
 import Useaxios from '../../hooks/Useaxios';
@@ -22,16 +23,61 @@ const AddApplication = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         companyName: '',
-        jobTitle: '',
+        jobRole: '',
         jobUrl: '',
         source: '',
         status: 'Applied', 
         appDate: new Date().toISOString().split('T')[0], 
+        interviewDate: '',
+        interviewTime: '',
         notes: ''
     });
 
     const sourceOptions = ['LinkedIn', 'Indeed', 'Glassdoor', 'Company Website', 'Referral', 'Other'];
     const statusOptions = ['Saved', 'Applied', 'Assessment', 'Interview', 'Offered', 'Rejected'];
+    const jobRoleOptions = [
+        'Frontend Developer',
+        'Backend Developer',
+        'Full Stack Developer',
+        'MERN Stack Developer',
+        'MEAN Stack Developer',
+        'React Developer',
+        'Angular Developer',
+        'Vue.js Developer',
+        'Node.js Developer',
+        'Python Developer',
+        'Java Developer',
+        'PHP Developer',
+        'WordPress Developer',
+        'Mobile App Developer',
+        'Flutter Developer',
+        'React Native Developer',
+        'iOS Developer',
+        'Android Developer',
+        'DevOps Engineer',
+        'Cloud Engineer',
+        'AWS Developer',
+        'Data Scientist',
+        'Machine Learning Engineer',
+        'AI Engineer',
+        'Database Administrator',
+        'System Administrator',
+        'Network Engineer',
+        'Cybersecurity Analyst',
+        'UI/UX Designer',
+        'Graphics Designer',
+        'Video Editor',
+        'Motion Graphics Designer',
+        'Content Writer',
+        'SEO Specialist',
+        'Digital Marketer',
+        'Product Manager',
+        'Project Manager',
+        'Business Analyst',
+        'QA Engineer',
+        'Software Tester',
+        'Other'
+    ];
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -41,11 +87,13 @@ const AddApplication = () => {
     const resetForm = () => {
         setFormData({
             companyName: '',
-            jobTitle: '',
+            jobRole: '',
             jobUrl: '',
             source: '',
             status: 'Applied',
             appDate: new Date().toISOString().split('T')[0],
+            interviewDate: '',
+            interviewTime: '',
             notes: ''
         });
     };
@@ -117,7 +165,7 @@ const AddApplication = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                                <FiLayers className="text-indigo-500" /> Company Name
+                                <FiLayers className="text-indigo-500" /> Company Name <span className="text-red-500">*</span>
                             </label>
                             <input 
                                 type="text"
@@ -132,17 +180,21 @@ const AddApplication = () => {
 
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                                <FiBriefcase className="text-indigo-500" /> Job Title
+                                <FiCode className="text-indigo-500" /> Job Role / Position <span className="text-red-500">*</span>
                             </label>
-                            <input 
-                                type="text"
-                                name="jobTitle"
+                            <select 
+                                name="jobRole"
                                 required
-                                value={formData.jobTitle}
+                                value={formData.jobRole}
                                 onChange={handleChange}
-                                placeholder="e.g. Frontend Developer"
-                                className="w-full px-4 py-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all placeholder:text-gray-300"
-                            />
+                                className="w-full px-4 py-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all text-gray-600 appearance-none cursor-pointer"
+                            >
+                                <option value="" disabled className="text-gray-300">Select your job role</option>
+                                {jobRoleOptions.map(opt => (
+                                    <option key={opt} value={opt} className="text-gray-700">{opt}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">🤖 AI will generate interview questions based on this role</p>
                         </div>
                     </div>
 
@@ -162,7 +214,7 @@ const AddApplication = () => {
 
                     <div className="flex flex-col gap-2">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                            <FiGlobe className="text-indigo-500" /> Source Dropdown
+                            <FiGlobe className="text-indigo-500" /> Source
                         </label>
                         <select 
                             name="source"
@@ -180,7 +232,7 @@ const AddApplication = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                                <FiCheckCircle className="text-indigo-500" /> Application Status <span className="text-red-500">*</span>
+                                <FiCheckCircle className="text-indigo-500" /> Status <span className="text-red-500">*</span>
                             </label>
                             <select 
                                 name="status"
@@ -204,6 +256,33 @@ const AddApplication = () => {
                                 name="appDate"
                                 required
                                 value={formData.appDate}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all text-gray-600"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <FiCalendar className="text-indigo-500" /> Interview Date
+                            </label>
+                            <input 
+                                type="date"
+                                name="interviewDate"
+                                value={formData.interviewDate}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all text-gray-600"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <FiCalendar className="text-indigo-500" /> Interview Time
+                            </label>
+                            <input 
+                                type="time"
+                                name="interviewTime"
+                                value={formData.interviewTime}
                                 onChange={handleChange}
                                 className="w-full px-4 py-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all text-gray-600"
                             />
