@@ -1,32 +1,27 @@
 import { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import SuccessMessage from './../../component/shared/SuccessMessage';
-import ErrorMessage from './../../component/shared/ErrorMessage';
-import LoadingSpinner from './../../component/shared/LoadingSpinner';
 import { 
-
     FiUser, 
     FiMail, 
     FiLock, 
     FiEye, 
     FiEyeOff, 
     FiArrowRight,
-    FiAlertCircle,
-    FiGithub,
-    FiLinkedin
+    FiAlertCircle
 } from 'react-icons/fi';
 import { Authcontext } from '../../context/Authprovider';
 
 const Register = () => {
     const navigate = useNavigate();
-    const { createUser, updateUserProfile, googleSignIn, setLoading } = useContext(Authcontext);
+    const { createUser, updateUserProfile, googleSignIn, setLoading, sendEmailVerification } = useContext(Authcontext);
     
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [registeredEmail, setRegisteredEmail] = useState('');
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
@@ -102,7 +97,7 @@ const Register = () => {
         if (!formData.email) {
             newErrors.email = 'Email is required';
         } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-            newErrors.email = 'Please enter a valid email';
+            newErrors.email = 'Please enter a valid email address';
         }
 
         if (!formData.password) {
@@ -136,19 +131,30 @@ const Register = () => {
             
             await updateUserProfile(formData.fullName, '');
             
-            setSuccess('Account created successfully! Redirecting...');
+            try {
+                await sendEmailVerification();
+            } catch (verifyError) {
+                console.log('Verification email error:', verifyError);
+            }
+            
+            setRegisteredEmail(formData.email);
+            
+            setSuccess(`Verification email sent to ${formData.email}. Please check your inbox and verify your email.`);
             
             setTimeout(() => {
-                navigate('/dashboard');
-            }, 1500);
+                navigate('/login');
+            }, 4000);
+            
         } catch (err) {
             console.error(err);
             if (err.code === 'auth/email-already-in-use') {
                 setError('This email is already registered. Please login.');
             } else if (err.code === 'auth/weak-password') {
                 setError('Password should be at least 6 characters.');
+            } else if (err.code === 'auth/invalid-email') {
+                setError('Invalid email address. Please enter a valid email.');
             } else {
-                setError('Something went wrong. Please try again.');
+                setError(err.message || 'Something went wrong. Please try again.');
             }
         } finally {
             setIsLoading(false);
@@ -156,7 +162,6 @@ const Register = () => {
         }
     };
 
-    // গুগল দিয়ে রেজিস্ট্রেশন
     const handleGoogleSignIn = async () => {
         setError('');
         setSuccess('');
@@ -180,7 +185,6 @@ const Register = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative overflow-hidden">
-            {/* ডেকোরেটিভ এলিমেন্টস */}
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-96 h-96 bg-gradient-to-br from-indigo-200/30 to-purple-200/30 rounded-full blur-3xl animate-pulse" />
                 <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-gradient-to-tr from-purple-200/30 to-pink-200/30 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -190,7 +194,6 @@ const Register = () => {
                 }} />
             </div>
 
-            {/* মেইন কার্ড */}
             <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -198,13 +201,12 @@ const Register = () => {
                 className="relative z-10 w-full max-w-[530px]"
             >
                 <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8 sm:p-10">
-                    {/* হেডার */}
                     <div className="text-center mb-8">
                         <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{ duration: 0.5, type: "spring", stiffness: 200 }}
-                            className="w-20  h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-300/50"
+                            className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-300/50"
                         >
                             <span className="text-4xl">🚀</span>
                         </motion.div>
@@ -216,7 +218,6 @@ const Register = () => {
                         </p>
                     </div>
 
-                    {/* মেসেজ */}
                     <AnimatePresence mode="wait">
                         {error && (
                             <motion.div
@@ -225,7 +226,16 @@ const Register = () => {
                                 exit={{ opacity: 0, y: -10 }}
                                 className="mb-4"
                             >
-                                <ErrorMessage message={error} onClose={() => setError('')} />
+                                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                                    <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
+                                    <span>{error}</span>
+                                    <button 
+                                        onClick={() => setError('')}
+                                        className="ml-auto text-red-400 hover:text-red-600"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
                             </motion.div>
                         )}
                         {success && (
@@ -235,17 +245,18 @@ const Register = () => {
                                 exit={{ opacity: 0, y: -10 }}
                                 className="mb-4"
                             >
-                                <SuccessMessage message={success} />
+                                <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-600 text-sm">
+                                    <span>✅</span>
+                                    <span>{success}</span>
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
 
-                    {/* ফর্ম */}
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* ফুল নেম */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Full Name
+                                Full Name <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -272,10 +283,9 @@ const Register = () => {
                             )}
                         </div>
 
-                        {/* ইমেইল */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Email Address
+                                Email Address <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -302,10 +312,9 @@ const Register = () => {
                             )}
                         </div>
 
-                        {/* পাসওয়ার্ড */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Password
+                                Password <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -328,7 +337,6 @@ const Register = () => {
                                 </button>
                             </div>
                             
-                            {/* পাসওয়ার্ড স্ট্রেংথ */}
                             {formData.password && (
                                 <div className="mt-2">
                                     <div className="flex gap-1">
@@ -361,10 +369,9 @@ const Register = () => {
                             )}
                         </div>
 
-                        {/* কনফর্ম পাসওয়ার্ড */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Confirm Password
+                                Confirm Password <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -398,15 +405,17 @@ const Register = () => {
                             )}
                         </div>
 
-                        {/* রেজিস্টার বাটন */}
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className=" cursor-pointer w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:shadow-indigo-300/50 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="cursor-pointer w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:shadow-indigo-300/50 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
                                 <>
-                                    <LoadingSpinner size="sm" color="white" />
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
                                     Creating Account...
                                 </>
                             ) : (
@@ -418,7 +427,6 @@ const Register = () => {
                         </button>
                     </form>
 
-                    {/* অল্টারনেটিভ রেজিস্টার */}
                     <div className="mt-8">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
@@ -429,7 +437,7 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <div className=" mt-6">
+                        <div className="mt-6">
                             <button 
                                 onClick={handleGoogleSignIn}
                                 disabled={isLoading}
@@ -443,11 +451,9 @@ const Register = () => {
                                 </svg>
                                 <span className="text-sm font-medium text-gray-700 hidden sm:inline">Google</span>
                             </button>
-                       
                         </div>
                     </div>
 
-                    {/* লগইন লিংক */}
                     <div className="text-center mt-8 pt-6 border-t border-gray-200">
                         <p className="text-gray-600">
                             Already have an account?{' '}

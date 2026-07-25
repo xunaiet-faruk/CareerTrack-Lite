@@ -13,6 +13,7 @@ import Interview from "../pages/Dashboard/DashboardRoutes/Interview";
 import Applied from "../pages/Dashboard/DashboardRoutes/Applied";
 import Setting from "../pages/Dashboard/DashboardRoutes/Setting";
 import ProtectedRoute from "./ProtectedRoute";
+import AIResumeReview from "../pages/Dashboard/DashboardRoutes/AIResumeReview";
 
 
 export const router = createBrowserRouter([
@@ -68,8 +69,8 @@ export const router = createBrowserRouter([
         element : <Applied/>
       },
       {
-        path: "settings",
-        element : <Setting/>    
+        path: "resume-review",
+        element : <AIResumeReview/>    
       }
     ],
   },

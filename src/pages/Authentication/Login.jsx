@@ -1,22 +1,19 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
     FiMail, 
     FiLock, 
     FiEye, 
     FiEyeOff, 
     FiArrowRight,
-    FiAlertCircle,
-    FiGithub,
-    FiLinkedin
+    FiAlertCircle
 } from 'react-icons/fi';
-import LoadingSpinner from '../../component/shared/LoadingSpinner';
 import { Authcontext } from '../../context/Authprovider';
 
 const Login = () => {
     const navigate = useNavigate();
-    const { signInUser, googleSignIn, setLoading } = useContext(Authcontext);
+    const { signIn, googleSignIn, setLoading, logOut } = useContext(Authcontext);
     
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +23,6 @@ const Login = () => {
         password: ''
     });
     const [errors, setErrors] = useState({});
-    const [rememberMe, setRememberMe] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -34,6 +30,7 @@ const Login = () => {
             ...prev,
             [name]: value
         }));
+        
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
@@ -44,16 +41,17 @@ const Login = () => {
 
     const validate = () => {
         const newErrors = {};
+
         if (!formData.email) {
             newErrors.email = 'Email is required';
         } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-            newErrors.email = 'Please enter a valid email';
+            newErrors.email = 'Please enter a valid email address';
         }
+
         if (!formData.password) {
             newErrors.password = 'Password is required';
-        } else if (formData.password.length < 6) {
-            newErrors.password = 'Password must be at least 6 characters';
         }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -68,18 +66,30 @@ const Login = () => {
         setLoading(true);
 
         try {
-            await signInUser(formData.email, formData.password);
-            navigate('/dashboard');
+            const result = await signIn(formData.email, formData.password);
+            
+            if (result.user) {
+                if (!result.user.emailVerified) {
+                    setError('⚠️ Please verify your email first. Check your inbox for the verification link.');
+                    await logOut();
+                    setIsLoading(false);
+                    setLoading(false);
+                    return;
+                }
+                navigate('/dashboard');
+            }
         } catch (err) {
             console.error(err);
             if (err.code === 'auth/user-not-found') {
-                setError('No account found with this email.');
+                setError('No account found with this email. Please register first.');
             } else if (err.code === 'auth/wrong-password') {
                 setError('Incorrect password. Please try again.');
+            } else if (err.code === 'auth/invalid-email') {
+                setError('Invalid email address. Please enter a valid email.');
             } else if (err.code === 'auth/too-many-requests') {
                 setError('Too many failed attempts. Please try again later.');
             } else {
-                setError('Login failed. Please try again.');
+                setError('Invalid email or password. Please try again.');
             }
         } finally {
             setIsLoading(false);
@@ -87,7 +97,6 @@ const Login = () => {
         }
     };
 
-    // গুগল দিয়ে লগইন
     const handleGoogleSignIn = async () => {
         setError('');
         setIsLoading(true);
@@ -106,7 +115,7 @@ const Login = () => {
     };
 
     return (
-        <div className="flex items-center justify-center px-4 py-20 bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative overflow-hidden">
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-96 h-96 bg-gradient-to-br from-indigo-200/30 to-purple-200/30 rounded-full blur-3xl animate-pulse" />
                 <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-gradient-to-tr from-purple-200/30 to-pink-200/30 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -120,10 +129,9 @@ const Login = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className="relative z-10 w-full max-w-[500px]"
+                className="relative z-10 w-full max-w-[480px]"
             >
                 <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8 sm:p-10">
-                    {/* হেডার */}
                     <div className="text-center mb-8">
                         <motion.div
                             initial={{ scale: 0 }}
@@ -131,34 +139,42 @@ const Login = () => {
                             transition={{ duration: 0.5, type: "spring", stiffness: 200 }}
                             className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-300/50"
                         >
-                            <span className="text-4xl">🚀</span>
+                            <span className="text-4xl">🔐</span>
                         </motion.div>
                         <h1 className="text-3xl font-bold text-gray-800">
-                            Welcome Back!
+                            Welcome Back
                         </h1>
                         <p className="text-gray-500 mt-2">
-                            Sign in to continue your job tracking journey
+                            Sign in to continue your job search journey
                         </p>
                     </div>
 
-                    {/* Error Message */}
-                    {error && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-600"
-                        >
-                            <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
-                            <p className="text-sm">{error}</p>
-                        </motion.div>
-                    )}
+                    <AnimatePresence mode="wait">
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="mb-4"
+                            >
+                                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                                    <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
+                                    <span>{error}</span>
+                                    <button 
+                                        onClick={() => setError('')}
+                                        className="ml-auto text-red-400 hover:text-red-600"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                    {/* ফর্ম */}
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* ইমেইল ফিল্ড */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Email Address
+                                Email Address <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -186,7 +202,9 @@ const Login = () => {
                         </div>
 
                         <div>
-                          
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Password <span className="text-red-500">*</span>
+                            </label>
                             <div className="relative">
                                 <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                                 <input
@@ -219,28 +237,23 @@ const Login = () => {
                             )}
                         </div>
 
-                        {/* রিমেম্বার মি */}
-                        <div className="flex items-center">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={() => setRememberMe(!rememberMe)}
-                                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-gray-600">Remember me</span>
-                            </label>
+                        <div className="flex items-center justify-between">
+                            <Link to="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition-colors">
+                                Forgot Password?
+                            </Link>
                         </div>
 
-                        {/* লগইন বাটন */}
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:shadow-indigo-300/50 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="cursor-pointer w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:shadow-indigo-300/50 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
                                 <>
-                                    <LoadingSpinner size="sm" color="white" />
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
                                     Signing In...
                                 </>
                             ) : (
@@ -252,7 +265,6 @@ const Login = () => {
                         </button>
                     </form>
 
-                    {/* অল্টারনেটিভ লগইন */}
                     <div className="mt-8">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
@@ -263,11 +275,11 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <div className=" mt-6">
+                        <div className="mt-6">
                             <button 
                                 onClick={handleGoogleSignIn}
                                 disabled={isLoading}
-                                className="flex w-full cursor-pointer items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105 disabled:opacity-50"
+                                className="flex items-center w-full cursor-pointer justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-indigo-300 transition-all duration-300 hover:scale-105 disabled:opacity-50"
                             >
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -277,11 +289,9 @@ const Login = () => {
                                 </svg>
                                 <span className="text-sm font-medium text-gray-700 hidden sm:inline">Google</span>
                             </button>
-                           
                         </div>
                     </div>
 
-                    {/* রেজিস্টার লিংক */}
                     <div className="text-center mt-8 pt-6 border-t border-gray-200">
                         <p className="text-gray-600">
                             Don't have an account?{' '}

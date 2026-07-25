@@ -56,7 +56,7 @@ const DashboardSidebar = () => {
         { path: '/dashboard/applied', name: 'Applied', icon: FiFileText, emoji: '📤' },
         { path: '/dashboard/interview', name: 'Interview', icon: FiUsers, emoji: '🎯' },
         { path: '/dashboard/analytics', name: 'Analytics', icon: FiBarChart2, emoji: '📈' },
-        { path: '/dashboard/settings', name: 'Settings', icon: FiSettings, emoji: '⚙️' },
+        { path: '/dashboard/resume-review', name: 'Resume Review', icon: FiCheckCircle, emoji: '📄' },
     ];
 
     const handleLogout = async () => {
