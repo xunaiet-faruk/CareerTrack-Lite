@@ -12,13 +12,62 @@ import {
     FiBarChart2,
     FiDownload,
     FiEye,
-    FiRefreshCw
+    FiRefreshCw,
+    FiTrash2,
+    FiLoader
 } from 'react-icons/fi';
 
 import { toast } from 'react-toastify';
 import { Authcontext } from '../../../context/Authprovider';
 import Useaxios from '../../../hooks/Useaxios';
 import LoadingSpinner from '../../../component/shared/LoadingSpinner';
+
+// Custom Confirm Dialog Component
+const ConfirmDialog = ({ isOpen, onClose, onConfirm, fileName }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl"
+            >
+                <div className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                        <FiTrash2 className="w-8 h-8 text-red-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Delete Resume?</h3>
+                    <p className="text-gray-600 text-sm mb-1">
+                        Are you sure you want to delete
+                    </p>
+                    <p className="text-gray-800 font-medium text-sm mb-4">
+                        "{fileName}"?
+                    </p>
+                    <p className="text-xs text-gray-400 mb-6">
+                        This action cannot be undone.
+                    </p>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onClose}
+                            className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium text-sm"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                        >
+                            <FiTrash2 className="w-4 h-4" />
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
 
 const AIResumeReview = () => {
     const { user } = useContext(Authcontext);
@@ -32,6 +81,11 @@ const AIResumeReview = () => {
     const [resumes, setResumes] = useState([]);
     const [selectedResume, setSelectedResume] = useState(null);
     const [jobRole, setJobRole] = useState('');
+    const [deletingId, setDeletingId] = useState(null);
+    
+    // New states for custom confirm dialog
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [resumeToDelete, setResumeToDelete] = useState(null);
 
     const jobRoleOptions = [
         'Frontend Developer',
@@ -65,6 +119,9 @@ const AIResumeReview = () => {
                 setResumes(res.data.data);
                 if (res.data.data.length > 0) {
                     setSelectedResume(res.data.data[0]);
+                } else {
+                    setSelectedResume(null);
+                    setAnalysis(null);
                 }
             }
         } catch (error) {
@@ -143,6 +200,46 @@ const AIResumeReview = () => {
             toast.error('Failed to analyze resume');
         } finally {
             setAnalyzing(false);
+        }
+    };
+
+    // Show confirmation dialog instead of alert
+    const handleDeleteClick = (resume) => {
+        setResumeToDelete(resume);
+        setShowConfirmDialog(true);
+    };
+
+    // Actual delete function
+    const confirmDelete = async () => {
+        if (!resumeToDelete) return;
+        
+        setDeletingId(resumeToDelete._id);
+        setShowConfirmDialog(false);
+        
+        try {
+            const res = await axios.delete(`/api/resume/${resumeToDelete._id}`);
+            
+            if (res.data.success) {
+                toast.success(`"${resumeToDelete.fileName}" deleted successfully!`);
+                
+                const updatedResumes = resumes.filter(r => r._id !== resumeToDelete._id);
+                setResumes(updatedResumes);
+                
+                if (selectedResume?._id === resumeToDelete._id) {
+                    setSelectedResume(updatedResumes[0] || null);
+                    setAnalysis(updatedResumes[0]?.analysis || null);
+                }
+                
+                await fetchResumes();
+            } else {
+                toast.error(res.data.error || 'Failed to delete resume');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            toast.error(error.response?.data?.error || 'Failed to delete resume');
+        } finally {
+            setDeletingId(null);
+            setResumeToDelete(null);
         }
     };
 
@@ -258,33 +355,56 @@ const AIResumeReview = () => {
                             </button>
                         </div>
 
+                        {/* Resumes List with Delete Button */}
                         {resumes.length > 0 && (
                             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                                <h4 className="font-semibold text-gray-700 text-sm mb-3 flex items-center gap-2">
-                                    <FiEye className="text-indigo-600" />
-                                    Your Resumes
+                                <h4 className="font-semibold text-gray-700 text-sm mb-3 flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <FiEye className="text-indigo-600" />
+                                        Your Resumes ({resumes.length})
+                                    </span>
+                                    <span className="text-xs text-gray-400">Click to view</span>
                                 </h4>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
                                     {resumes.map((resume) => (
-                                        <button
+                                        <div
                                             key={resume._id}
-                                            onClick={() => {
-                                                setSelectedResume(resume);
-                                                setAnalysis(resume.analysis || null);
-                                            }}
-                                            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                                                 selectedResume?._id === resume._id
-                                                    ? 'bg-indigo-50 text-indigo-700'
-                                                    : 'hover:bg-gray-50 text-gray-600'
+                                                    ? 'bg-indigo-50 border border-indigo-200'
+                                                    : 'hover:bg-gray-50 border border-transparent'
                                             }`}
                                         >
-                                            <span className="truncate flex-1">{resume.fileName}</span>
-                                            {resume.analysis && (
-                                                <span className="text-xs font-bold text-indigo-600">
-                                                    {resume.analysis.score}%
-                                                </span>
-                                            )}
-                                        </button>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedResume(resume);
+                                                    setAnalysis(resume.analysis || null);
+                                                }}
+                                                className="flex-1 text-left text-sm text-gray-600 truncate flex items-center gap-2"
+                                            >
+                                                <FiFile className="text-indigo-400 flex-shrink-0" />
+                                                <span className="truncate">{resume.fileName}</span>
+                                                {resume.analysis && (
+                                                    <span className={`text-xs font-bold ${getScoreColor(resume.analysis.score)}`}>
+                                                        {resume.analysis.score}%
+                                                    </span>
+                                                )}
+                                            </button>
+                                            
+                                            {/* Delete Button - Now opens custom dialog */}
+                                            <button
+                                                onClick={() => handleDeleteClick(resume)}
+                                                disabled={deletingId === resume._id}
+                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                                title="Delete resume"
+                                            >
+                                                {deletingId === resume._id ? (
+                                                    <FiLoader className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <FiTrash2 className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -309,7 +429,7 @@ const AIResumeReview = () => {
                                         <div>
                                             <h3 className="font-semibold text-gray-800">Resume Analysis</h3>
                                             <p className="text-xs text-gray-400">
-                                                Analyzed on {new Date().toLocaleDateString()}
+                                                {selectedResume?.fileName} • Analyzed on {new Date(selectedResume?.analyzedAt).toLocaleDateString()}
                                             </p>
                                         </div>
                                         <button
@@ -429,6 +549,16 @@ const AIResumeReview = () => {
                     </div>
                 </div>
             </div>
+
+            <ConfirmDialog 
+                isOpen={showConfirmDialog}
+                onClose={() => {
+                    setShowConfirmDialog(false);
+                    setResumeToDelete(null);
+                }}
+                onConfirm={confirmDelete}
+                fileName={resumeToDelete?.fileName}
+            />
         </div>
     );
 };
