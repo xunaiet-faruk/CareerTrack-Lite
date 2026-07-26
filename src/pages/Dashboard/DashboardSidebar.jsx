@@ -55,8 +55,9 @@ const DashboardSidebar = () => {
         { path: '/dashboard/all-applications', name: 'All Applications', icon: FiGrid, emoji: '📋' },
         { path: '/dashboard/applied', name: 'Applied', icon: FiFileText, emoji: '📤' },
         { path: '/dashboard/interview', name: 'Interview', icon: FiUsers, emoji: '🎯' },
-        { path: '/dashboard/analytics', name: 'Analytics', icon: FiBarChart2, emoji: '📈' },
         { path: '/dashboard/resume-review', name: 'Resume Review', icon: FiCheckCircle, emoji: '📄' },
+        { path: '/dashboard/daily-learning-plan', name: 'Daily Learning', icon: FiBarChart2, emoji: '📈' },
+        { path: '/dashboard/cover-letter', name: 'Cover Letter', icon: FiFileText, emoji: '✉️' },
     ];
 
     const handleLogout = async () => {
@@ -73,6 +74,7 @@ const DashboardSidebar = () => {
             transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
             className="h-screen bg-white/80 backdrop-blur-md border-r border-indigo-100 flex flex-col shadow-[4px_0_24px_rgba(79,70,229,0.03)] select-none flex-shrink-0 sticky top-0"
         >
+            {/* Collapse Button */}
             <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className="absolute top-8 -right-3.5 bg-white border border-indigo-100 text-indigo-600 rounded-full p-1.5 hover:bg-indigo-50 shadow-md transition-all duration-200 z-50"
@@ -86,9 +88,8 @@ const DashboardSidebar = () => {
             </button>
 
             <div className="flex flex-col h-full">
+                {/* User Profile */}
                 <div className="flex-shrink-0 my-5">
-                   
-
                     <div className="px-4 py-4 border-b border-indigo-50/50">
                         <Link to="/" className="block">
                             <motion.div
@@ -133,13 +134,14 @@ const DashboardSidebar = () => {
                     </div>
                 </div>
 
+                {/* Menu Items */}
                 <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-1 custom-scrollbar">
                     {menuItems.map((item) => {
                         const isActive = location.pathname === item.path;
                         const Icon = item.icon;
 
                         return (
-                            <Link key={item.path} to={item.path} className="block relative">
+                            <Link key={item.path} to={item.path} className="block relative group">
                                 <motion.div
                                     className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors relative z-10 ${
                                         isActive 
@@ -157,14 +159,16 @@ const DashboardSidebar = () => {
                                         />
                                     )}
 
-                                    <div className="flex items-center justify-center w-5 h-5 flex-shrink-0">
+                                    {/* Icon / Emoji */}
+                                    <div className="flex items-center justify-center w-6 h-6 flex-shrink-0">
                                         {isCollapsed ? (
-                                            <span className="text-base">{item.emoji}</span>
+                                            <span className="text-xl leading-none">{item.emoji}</span>
                                         ) : (
-                                            <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                                            <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-indigo-600'}`} />
                                         )}
                                     </div>
 
+                                    {/* Menu Name */}
                                     <AnimatePresence>
                                         {!isCollapsed && (
                                             <motion.span
@@ -178,9 +182,10 @@ const DashboardSidebar = () => {
                                         )}
                                     </AnimatePresence>
 
+                                    {/* Tooltip when collapsed */}
                                     {isCollapsed && (
-                                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                                            {item.name}
+                                        <div className="absolute left-full ml-3 px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                                            {item.emoji} {item.name}
                                         </div>
                                     )}
                                 </motion.div>
@@ -189,6 +194,7 @@ const DashboardSidebar = () => {
                     })}
                 </div>
 
+                {/* Logout Button */}
                 <div className="flex-shrink-0 p-4 border-t border-indigo-50/50">
                     <motion.button
                         onClick={handleLogout}
@@ -197,6 +203,7 @@ const DashboardSidebar = () => {
                         className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors group relative"
                     >
                         <FiLogOut className="w-5 h-5 text-gray-400 group-hover:text-red-600 flex-shrink-0" />
+                        
                         <AnimatePresence>
                             {!isCollapsed && (
                                 <motion.span
@@ -211,8 +218,8 @@ const DashboardSidebar = () => {
                         </AnimatePresence>
 
                         {isCollapsed && (
-                            <div className="absolute left-full ml-2 px-2 py-1 bg-red-600 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                                Logout
+                            <div className="absolute left-full ml-3 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                                🚪 Logout
                             </div>
                         )}
                     </motion.button>

@@ -13,7 +13,9 @@ import {
     FiTrendingUp,
     FiStar,
     FiAward,
-    FiMail
+    FiMail,
+    FiBookOpen,  // New icon for Q&A
+    FiX           // For closing modal
 } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { Authcontext } from '../../../context/Authprovider';
@@ -28,6 +30,12 @@ const Interview = () => {
     const [filteredApps, setFilteredApps] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sendingReminder, setSendingReminder] = useState(null);
+    
+    // New states for Q&A
+    const [showQAModal, setShowQAModal] = useState(false);
+    const [qaData, setQaData] = useState([]);
+    const [loadingQA, setLoadingQA] = useState(false);
+    const [selectedApp, setSelectedApp] = useState(null);
 
     useEffect(() => {
         if (user?.email) {
@@ -69,6 +77,52 @@ const Interview = () => {
             toast.error(error.response?.data?.error || 'Failed to send reminder');
         } finally {
             setSendingReminder(null);
+        }
+    };
+
+    // New function to fetch AI-generated Q&A
+    const handleViewQuestions = async (app) => {
+        try {
+            setSelectedApp(app);
+            setShowQAModal(true);
+            setLoadingQA(true);
+            
+            // Check if we already have cached questions
+            if (app.cachedQuestions) {
+                setQaData(app.cachedQuestions);
+                setLoadingQA(false);
+                return;
+            }
+
+            // Generate fresh questions using job role
+            const jobRole = app.jobRole || app.jobTitle || 'Professional';
+            const companyName = app.companyName || 'Company';
+            
+            // Call your backend API to generate questions
+            const response = await axios.post('/api/generate-questions', {
+                jobRole: jobRole,
+                companyName: companyName
+            });
+
+            if (response.data.success) {
+                setQaData(response.data.questions);
+                
+                // Cache the questions in the application object
+                const updatedApp = { ...app, cachedQuestions: response.data.questions };
+                setApplications(prev => 
+                    prev.map(a => a._id === app._id ? updatedApp : a)
+                );
+                setFilteredApps(prev => 
+                    prev.map(a => a._id === app._id ? updatedApp : a)
+                );
+            } else {
+                toast.error('Failed to generate questions');
+            }
+        } catch (error) {
+            console.error('Error fetching questions:', error);
+            toast.error('Failed to load interview questions');
+        } finally {
+            setLoadingQA(false);
         }
     };
 
@@ -244,7 +298,7 @@ const Interview = () => {
                                             </div>
                                             <p className="text-sm text-gray-600 ml-10 truncate flex items-center gap-1">
                                                 <FiBriefcase className="text-indigo-400 flex-shrink-0" />
-                                                {app.jobTitle || 'Position not specified'}
+                                                {app.jobTitle || app.jobRole || 'Position not specified'}
                                             </p>
                                         </div>
                                         {app.jobUrl && (
@@ -295,10 +349,12 @@ const Interview = () => {
                                                 <span className="text-xs">Source: {app.source}</span>
                                             </div>
                                         )}
-                                        {app.appDate && (
+                                        {(app.appDate || app.interviewDate) && (
                                             <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
                                                 <FiCalendar className="text-gray-400 text-xs" />
-                                                <span className="text-xs">Applied: {formatDate(app.appDate)}</span>
+                                                <span className="text-xs">
+                                                    {app.interviewDate ? `Interview: ${formatDate(app.interviewDate)}` : `Applied: ${formatDate(app.appDate)}`}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
@@ -315,51 +371,64 @@ const Interview = () => {
                                         </div>
                                     )}
 
-                                    {/* Footer with Send Reminder Button */}
-                                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                                        <div className="flex items-center gap-1 text-xs text-gray-400">
-                                            <FiClock className="w-3 h-3" />
-                                            <span>Applied {new Date(app.appDate).toLocaleDateString('en-US', { 
-                                                month: 'short', 
-                                                day: 'numeric',
-                                                year: 'numeric'
-                                            })}</span>
+                                    {/* Footer with Buttons */}
+                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                                                <FiClock className="w-3 h-3" />
+                                                <span>Applied {new Date(app.appDate).toLocaleDateString('en-US', { 
+                                                    month: 'short', 
+                                                    day: 'numeric',
+                                                    year: 'numeric'
+                                                })}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {/* New View Questions Button */}
+                                                <motion.button 
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                    onClick={() => handleViewQuestions(app)}
+                                                    className="text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+                                                >
+                                                    <FiBookOpen className="w-3 h-3" />
+                                                    Q&A
+                                                </motion.button>
+                                                
+                                                <motion.button 
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                    onClick={() => handleSendReminder(app._id)}
+                                                    disabled={sendingReminder === app._id}
+                                                    className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50"
+                                                >
+                                                    {sendingReminder === app._id ? (
+                                                        <>
+                                                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                                                            </svg>
+                                                            Sending...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <FiMail className="w-3 h-3" />
+                                                            Reminder
+                                                        </>
+                                                    )}
+                                                </motion.button>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <motion.button 
-                                                whileHover={{ scale: 1.05 }}
-                                                whileTap={{ scale: 0.95 }}
-                                                onClick={() => handleSendReminder(app._id)}
-                                                disabled={sendingReminder === app._id}
-                                                className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50"
-                                            >
-                                                {sendingReminder === app._id ? (
-                                                    <>
-                                                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
-                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                                                        </svg>
-                                                        Sending...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <FiMail className="w-3 h-3" />
-                                                        Send Reminder
-                                                    </>
-                                                )}
-                                            </motion.button>
-                                            <motion.button 
-                                                whileHover={{ scale: 1.05 }}
-                                                whileTap={{ scale: 0.95 }}
-                                                onClick={() => {
-                                                    toast.info('Update interview status feature coming soon!');
-                                                }}
-                                                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 px-3 py-1 hover:bg-indigo-50 rounded-lg transition-colors"
-                                            >
-                                                <FiCheckCircle className="w-3 h-3" />
-                                                Update
-                                            </motion.button>
-                                        </div>
+                                        <motion.button 
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => {
+                                                toast.info('Update interview status feature coming soon!');
+                                            }}
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center justify-center gap-1 px-3 py-1 hover:bg-indigo-50 rounded-lg transition-colors w-full"
+                                        >
+                                            <FiCheckCircle className="w-3 h-3" />
+                                            Update Status
+                                        </motion.button>
                                     </div>
                                 </div>
                             </motion.div>
@@ -367,6 +436,102 @@ const Interview = () => {
                     </div>
                 )}
             </div>
+
+            {/* Q&A Modal */}
+            {showQAModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
+                    >
+                        {/* Modal Header */}
+                        <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                    <FiBookOpen className="text-emerald-500" />
+                                    Interview Questions & Answers
+                                </h2>
+                                <p className="text-sm text-gray-500">
+                                    {selectedApp?.companyName} - {selectedApp?.jobRole || selectedApp?.jobTitle || 'Position'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowQAModal(false);
+                                    setQaData([]);
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <FiX className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                            {loadingQA ? (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+                                    <p className="text-gray-600">Generating AI-powered interview questions...</p>
+                                    <p className="text-sm text-gray-400 mt-1">This may take a moment</p>
+                                </div>
+                            ) : qaData.length > 0 ? (
+                                <div className="space-y-4">
+                                    {qaData.map((item, index) => (
+                                        <motion.div
+                                            key={index}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            className="bg-gray-50 rounded-xl p-5 border border-gray-100 hover:border-indigo-200 transition-colors"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex-shrink-0">
+                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">
+                                                        {index + 1}
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="text-base font-semibold text-gray-800 mb-2">
+                                                        {item.question}
+                                                    </h3>
+                                                    <div className="bg-white rounded-lg p-4 border border-gray-100">
+                                                        <p className="text-sm text-gray-700 leading-relaxed">
+                                                            <span className="text-indigo-500 font-medium">Answer: </span>
+                                                            {item.answer}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                    
+                                    {/* Tips section */}
+                                    <div className="bg-gradient-to-r from-indigo-50 to-emerald-50 rounded-xl p-5 border border-indigo-100 mt-6">
+                                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                                            <FiStar className="text-amber-500" />
+                                            Pro Tips
+                                        </h4>
+                                        <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                            <li>Practice answering these questions out loud</li>
+                                            <li>Customize answers with your personal experience</li>
+                                            <li>Use the STAR method for behavioral questions</li>
+                                            <li>Research {selectedApp?.companyName} before the interview</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <div className="text-4xl mb-4">🔍</div>
+                                    <h3 className="text-lg font-semibold text-gray-700">No Questions Available</h3>
+                                    <p className="text-gray-500 mt-1">Try generating questions again</p>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 };

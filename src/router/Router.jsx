@@ -14,6 +14,7 @@ import Applied from "../pages/Dashboard/DashboardRoutes/Applied";
 import Setting from "../pages/Dashboard/DashboardRoutes/Setting";
 import ProtectedRoute from "./ProtectedRoute";
 import AIResumeReview from "../pages/Dashboard/DashboardRoutes/AIResumeReview";
+import { AiFillAccountBook } from "react-icons/ai";
 
 
 export const router = createBrowserRouter([
@@ -71,6 +72,14 @@ export const router = createBrowserRouter([
       {
         path: "resume-review",
         element : <AIResumeReview/>    
+      },
+      {
+        path: "Daily-Learning-Plan",
+        element : <AIResumeReview/>    
+      },
+      {
+        path:'CoverLetter',
+        element:<AiFillAccountBook/>
       }
     ],
   },
