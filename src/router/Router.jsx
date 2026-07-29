@@ -15,7 +15,9 @@ import Setting from "../pages/Dashboard/DashboardRoutes/Setting";
 import ProtectedRoute from "./ProtectedRoute";
 import AIResumeReview from "../pages/Dashboard/DashboardRoutes/AIResumeReview";
 import { AiFillAccountBook } from "react-icons/ai";
-import DailyLearningPlan from "../pages/Dashboard/DashboardRoutes/DailyLearningPlan";
+import DailyLearningPlan from "../pages/Dashboard/DashboardRoutes/CareerGrowthHub";
+import CareerGrowthHub from "../pages/Dashboard/DashboardRoutes/CareerGrowthHub";
+import CreateCoverLetter from "../pages/Dashboard/DashboardRoutes/CreateCoverLetter";
 
 
 export const router = createBrowserRouter([
@@ -75,12 +77,12 @@ export const router = createBrowserRouter([
         element : <AIResumeReview/>    
       },
       {
-        path: "Daily-Learning-Plan",
-        element : <DailyLearningPlan/>   
+        path: "Career-Growth-Daily",
+        element : <CareerGrowthHub/>   
       },
       {
         path:'CoverLetter',
-        element:<AiFillAccountBook/>
+        element:<CreateCoverLetter/>
       }
     ],
   },

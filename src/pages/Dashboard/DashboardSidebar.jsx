@@ -56,8 +56,8 @@ const DashboardSidebar = () => {
         { path: '/dashboard/applied', name: 'Applied', icon: FiFileText, emoji: '📤' },
         { path: '/dashboard/interview', name: 'Interview', icon: FiUsers, emoji: '🎯' },
         { path: '/dashboard/resume-review', name: 'Resume Review', icon: FiCheckCircle, emoji: '📄' },
-        { path: '/dashboard/daily-learning-plan', name: 'Daily Learning', icon: FiBarChart2, emoji: '📈' },
-        { path: '/dashboard/cover-letter', name: 'Cover Letter', icon: FiFileText, emoji: '✉️' },
+        { path: '/dashboard/Career-Growth-Daily', name: 'Career Growth Daily', icon: FiBarChart2, emoji: '📈' },
+        { path: '/dashboard/CoverLetter', name: 'Create Cover Letter', icon: FiFileText, emoji: '✉️' },
     ];
 
     const handleLogout = async () => {
