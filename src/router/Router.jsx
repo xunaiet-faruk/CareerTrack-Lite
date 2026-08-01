@@ -18,6 +18,7 @@ import { AiFillAccountBook } from "react-icons/ai";
 import DailyLearningPlan from "../pages/Dashboard/DashboardRoutes/CareerGrowthHub";
 import CareerGrowthHub from "../pages/Dashboard/DashboardRoutes/CareerGrowthHub";
 import CreateCoverLetter from "../pages/Dashboard/DashboardRoutes/CreateCoverLetter";
+import MockInterview from "../pages/Dashboard/DashboardRoutes/MockInterview";
 
 
 export const router = createBrowserRouter([
@@ -83,6 +84,10 @@ export const router = createBrowserRouter([
       {
         path:'CoverLetter',
         element:<CreateCoverLetter/>
+      },
+      {
+        path:'Mock-Interview',
+        element:<MockInterview/>
       }
     ],
   },

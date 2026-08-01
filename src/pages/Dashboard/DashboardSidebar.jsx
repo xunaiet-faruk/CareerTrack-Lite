@@ -58,6 +58,7 @@ const DashboardSidebar = () => {
         { path: '/dashboard/resume-review', name: 'Resume Review', icon: FiCheckCircle, emoji: '📄' },
         { path: '/dashboard/Career-Growth-Daily', name: 'Career Growth Daily', icon: FiBarChart2, emoji: '📈' },
         { path: '/dashboard/CoverLetter', name: 'Create Cover Letter', icon: FiFileText, emoji: '✉️' },
+        { path: '/dashboard/Mock-Interview', name: 'Ai Mock Interview', icon: FiUsers, emoji: '🎭' },
     ];
 
     const handleLogout = async () => {

@@ -191,81 +191,88 @@ const CreateCoverLetter = () => {
         }
     };
 
-    const handleGenerate = async (e) => {
-        e.preventDefault();
+   const handleGenerate = async (e) => {
+    e.preventDefault();
+    
+    if (!form.jobTitle.trim() || !form.companyName.trim()) {
+        toast.warn('Please provide Job Title and Company Name');
+        return;
+    }
+
+    const filledEducations = form.educations.filter(edu => edu.level.trim() && edu.institution.trim());
+    if (filledEducations.length < 2) {
+        toast.warn("Please provide at least 2 education entries (e.g., HSC + Bachelor's)");
+        setOpenSection('professional');
+        return;
+    }
+
+    // Education text for display (fallback)
+    const educationText = filledEducations
+        .map(edu => `${edu.level}${edu.field ? ' in ' + edu.field : ''} from ${edu.institution}${edu.year ? ' (' + edu.year + ')' : ''}`)
+        .join('; ');
+
+    try {
+        setGenerating(true);
+        setActiveLetter(null);
+        setIsEditing(false);
         
-        if (!form.jobTitle.trim() || !form.companyName.trim()) {
-            toast.warn('Please provide Job Title and Company Name');
-            return;
-        }
+        // Send both education text AND educations array
+        const res = await axios.post('/api/cover-letter/generate', {
+            userEmail: user.email,
+            ...form,
+            education: educationText,
+            educations: filledEducations // 👈 এইটা গুরুত্বপূর্ণ
+        });
+        
+        const newLetter = res.data?.data;
+        setActiveLetter(newLetter);
+        setLetters(prev => [newLetter, ...prev]);
+        toast.success('Cover letter generated! ✨');
+    } catch (error) {
+        console.error(error);
+        toast.error('Failed to generate cover letter');
+    } finally {
+        setGenerating(false);
+    }
+};
 
-        const filledEducations = form.educations.filter(edu => edu.level.trim() && edu.institution.trim());
-        if (filledEducations.length < 2) {
-            toast.warn("Please provide at least 2 education entries (e.g., HSC + Bachelor's)");
-            setOpenSection('professional');
-            return;
-        }
-
-        const educationText = filledEducations
-            .map(edu => `${edu.level}${edu.field ? ' in ' + edu.field : ''} from ${edu.institution}${edu.year ? ' (' + edu.year + ')' : ''}`)
-            .join('; ');
-
-        try {
-            setGenerating(true);
-            setActiveLetter(null);
-            setIsEditing(false);
-            const res = await axios.post('/api/cover-letter/generate', {
-                userEmail: user.email,
-                ...form,
-                education: educationText,
-                educations: filledEducations
-            });
-            const newLetter = res.data?.data;
-            setActiveLetter(newLetter);
-            setLetters(prev => [newLetter, ...prev]);
-            toast.success('Cover letter generated! ✨');
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to generate cover letter');
-        } finally {
-            setGenerating(false);
-        }
-    };
-
-    const handleRegenerate = async () => {
-        if (!activeLetter) return;
-        try {
-            setRegenerating(true);
-            // Regenerate with same data but fresh content
-            const res = await axios.post(`/api/cover-letter/${activeLetter._id}/regenerate`, {
-                tone: activeLetter.tone || 'professional',
-                // Pass all required data for regeneration
-                jobTitle: activeLetter.jobTitle,
-                companyName: activeLetter.companyName,
-                education: activeLetter.education,
-                skills: activeLetter.skills,
-                experience: activeLetter.experience,
-                projects: activeLetter.projects,
-                whyJob: activeLetter.whyJob,
-                whyHire: activeLetter.whyHire
-            });
-            
-            // Update with new content only, keep other data
-            const updated = { 
-                ...activeLetter, 
-                content: res.data?.data?.content,
-                regeneratedAt: new Date().toISOString()
-            };
-            setActiveLetter(updated);
-            setLetters(prev => prev.map(l => l._id === updated._id ? updated : l));
-            toast.success('Regenerated! 🔄');
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to regenerate');
-        } finally {
-            setRegenerating(false);
-        }
-    };
+ const handleRegenerate = async () => {
+    if (!activeLetter) return;
+    try {
+        setRegenerating(true);
+        const res = await axios.post(`/api/cover-letter/${activeLetter._id}/regenerate`, {
+            tone: activeLetter.tone || 'professional',
+            jobTitle: activeLetter.jobTitle,
+            companyName: activeLetter.companyName,
+            education: activeLetter.education,
+            educations: activeLetter.educations, // 👈 শিক্ষা অ্যারে পাঠান
+            skills: activeLetter.skills,
+            experience: activeLetter.experience,
+            projects: activeLetter.projects,
+            whyJob: activeLetter.whyJob,
+            whyHire: activeLetter.whyHire,
+            certifications: activeLetter.certifications,
+            github: activeLetter.github,
+            portfolio: activeLetter.portfolio,
+            linkedin: activeLetter.linkedin,
+            location: activeLetter.location
+        });
+        
+        const updated = { 
+            ...activeLetter, 
+            content: res.data?.data?.content,
+            regeneratedAt: new Date().toISOString()
+        };
+        setActiveLetter(updated);
+        setLetters(prev => prev.map(l => l._id === updated._id ? updated : l));
+        toast.success('Regenerated! 🔄');
+    } catch (error) {
+        console.error(error);
+        toast.error('Failed to regenerate');
+    } finally {
+        setRegenerating(false);
+    }
+};
 
     const handleSelectLetter = (letter) => {
         setActiveLetter(letter);
