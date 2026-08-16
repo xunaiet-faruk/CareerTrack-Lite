@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 
-const MODEL_URL = '/models';
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// CDN থেকে মডেল লোড করুন (Render-এ কাজ করবে)
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://career-track-lite-omz9.onrender.com';
 
 const EXPERIENCE_LEVELS = ['Fresher', 'Junior', 'Mid', 'Senior'];
 const INTERVIEW_TYPES = ['Technical', 'HR', 'Behavioral', 'Mixed'];
@@ -23,7 +25,7 @@ const JOB_ROLES = [
   'Other'
 ];
 
-const MockInterview = ({ userEmail }) => {
+const MockInterview = ({ userEmail = "test@test.com" }) => {
   const [step, setStep] = useState('setup');
   const [form, setForm] = useState({
     jobRole: '',
@@ -36,6 +38,7 @@ const MockInterview = ({ userEmail }) => {
   const [interview, setInterview] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState('');
+  const [suggested, setSuggested] = useState(null);
 
   const [mediaReady, setMediaReady] = useState(false);
   const [modelsReady, setModelsReady] = useState(false);
@@ -47,6 +50,7 @@ const MockInterview = ({ userEmail }) => {
   const [questionResults, setQuestionResults] = useState([]);
   const [analyzingCount, setAnalyzingCount] = useState(0);
   const [finalReport, setFinalReport] = useState(null);
+  const [modelLoadError, setModelLoadError] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -58,6 +62,52 @@ const MockInterview = ({ userEmail }) => {
   const samplesRef = useRef([]);
   const audioAnalyserRef = useRef(null);
   const micRafRef = useRef(null);
+  
+  // Track if we've already initialized camera
+  const initRef = useRef(false);
+  // FIX: Ref for analyzingCount to avoid stale closure
+  const analyzingCountRef = useRef(0);
+
+  // Sync analyzingCount ref with state
+  useEffect(() => {
+    analyzingCountRef.current = analyzingCount;
+  }, [analyzingCount]);
+// ==================== FETCH SUGGESTED ROLE ====================
+useEffect(() => {
+  const fetchSuggestion = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/mock-interview/suggested-role/${userEmail}`);
+      
+      // Handle non-JSON responses
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('⚠️ Non-JSON response from server');
+        return;
+      }
+      
+      if (!res.ok) {
+        console.warn(`⚠️ Server responded with ${res.status}`);
+        return;
+      }
+      
+      const json = await res.json();
+      if (json.success && json.data) {
+        setSuggested(json.data);
+        const role = json.data.jobRole || '';
+        const isKnownRole = JOB_ROLES.includes(role);
+        setForm(prev => ({
+          ...prev,
+          jobRole: isKnownRole ? role : 'Other',
+          customJobRole: isKnownRole ? '' : role,
+          interviewType: 'Technical'
+        }));
+      }
+    } catch (err) {
+      console.warn('Suggested role fetch failed:', err);
+    }
+  };
+  fetchSuggestion();
+}, [userEmail]);
 
   const handleFormChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -79,12 +129,467 @@ const MockInterview = ({ userEmail }) => {
     setStep('permissions');
   };
 
-  // ... (baki sob hook & function same thakbe, shudhu handleBeginInterview e jobRole pathanor somoy getFinalJobRole() use korben)
+  // ==================== CAMERA + MIC + MODELS SETUP ====================
+  useEffect(() => {
+    if (step !== 'permissions') return;
+    if (initRef.current) return; // Don't redo setup on re-renders
+    initRef.current = true;
+
+    let cancelled = false;
+    let modelLoadAttempted = false;
+
+    const setup = async () => {
+      // 1. Load face-api models
+      if (!modelLoadAttempted) {
+        modelLoadAttempted = true;
+        try {
+          console.log('🔄 Loading face-api models from CDN...');
+          console.log('📁 Model URL:', MODEL_URL);
+          
+          await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+          console.log('✅ TinyFaceDetector loaded');
+          
+          await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+          console.log('✅ FaceLandmark68 loaded');
+          
+          await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+          console.log('✅ FaceExpression loaded');
+          
+          if (!cancelled) {
+            setModelsReady(true);
+            setModelLoadError(false);
+            console.log('✅ All AI models loaded successfully!');
+          }
+        } catch (err) {
+          console.error('❌ Model load error:', err);
+          if (!cancelled) {
+            setModelLoadError(true);
+            setError('AI models failed to load. Please check your internet connection and try again. Error: ' + err.message);
+          }
+        }
+      }
+
+      try {
+        console.log('🎥 Requesting camera and microphone access...');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        
+        streamRef.current = stream;
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          console.log('✅ Video stream playing');
+        }
+        setMediaReady(true);
+
+        // 3. Mic level meter
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 512;
+          source.connect(analyser);
+          audioAnalyserRef.current = analyser;
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const tickMic = () => {
+            if (!cancelled) {
+              analyser.getByteFrequencyData(dataArray);
+              const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+              setMicLevel(Math.min(100, Math.round((avg / 255) * 100 * 3)));
+              micRafRef.current = requestAnimationFrame(tickMic);
+            }
+          };
+          tickMic();
+        } catch (audioErr) {
+          console.warn('⚠️ Audio context error:', audioErr);
+        }
+
+        // 4. Brightness check
+        const canvas = canvasRef.current;
+        const checkBrightness = () => {
+          if (!videoRef.current || !canvas || videoRef.current.readyState < 2) return;
+          try {
+            canvas.width = 80;
+            canvas.height = 60;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(videoRef.current, 0, 0, 80, 60);
+            const frame = ctx.getImageData(0, 0, 80, 60).data;
+            let total = 0;
+            for (let i = 0; i < frame.length; i += 4) {
+              total += (frame[i] + frame[i + 1] + frame[i + 2]) / 3;
+            }
+            const brightness = total / (frame.length / 4);
+            setBrightnessWarning(brightness < 60);
+          } catch (err) {
+            console.warn('⚠️ Brightness check error:', err);
+          }
+        };
+        sampleIntervalRef.current = setInterval(checkBrightness, 1500);
+        setTimeout(checkBrightness, 500);
+        
+      } catch (err) {
+        console.error('❌ Camera/mic setup error:', err);
+        if (!cancelled) {
+          setError('Could not access camera/microphone. Please allow permissions and refresh. Error: ' + err.message);
+        }
+      }
+    };
+
+    setup();
+
+    // FIX: Don't stop the stream here - let it survive to interview step
+    return () => {
+      cancelled = true;
+      if (sampleIntervalRef.current) clearInterval(sampleIntervalRef.current);
+      if (micRafRef.current) cancelAnimationFrame(micRafRef.current);
+    };
+  }, [step]);
+
+  // Stop the camera/mic stream ONLY when component unmounts
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        console.log('🛑 Stopping camera/mic tracks on component unmount');
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  // Re-attach the live stream to whichever video element is currently mounted
+  useEffect(() => {
+    if (videoRef.current && streamRef.current) {
+      console.log('📹 Re-attaching stream to video element');
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(err => {
+        console.warn('⚠️ Could not play video:', err);
+      });
+    }
+  }, [step]);
+
+  // ==================== FACE SAMPLING WHILE ANSWERING ====================
+  const startFaceSampling = useCallback(() => {
+    samplesRef.current = [];
+    if (sampleIntervalRef.current) {
+      clearInterval(sampleIntervalRef.current);
+    }
+    sampleIntervalRef.current = setInterval(async () => {
+      if (!videoRef.current || videoRef.current.readyState < 2) return;
+      try {
+        const detection = await faceapi
+          .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({
+            inputSize: 224,
+            scoreThreshold: 0.5
+          }))
+          .withFaceLandmarks()
+          .withFaceExpressions();
+
+        if (detection) {
+          const box = detection.detection.box;
+          const videoW = videoRef.current.videoWidth;
+          const videoH = videoRef.current.videoHeight;
+          const centerX = box.x + box.width / 2;
+          const centerY = box.y + box.height / 2;
+          const offsetX = Math.abs(centerX - videoW / 2) / (videoW / 2);
+          const offsetY = Math.abs(centerY - videoH / 2) / (videoH / 2);
+          const centeredScore = Math.max(0, 100 - (offsetX + offsetY) * 60);
+
+          const expressions = detection.expressions;
+          const positiveExpr = (expressions.happy || 0) + (expressions.neutral || 0) * 0.6;
+
+          samplesRef.current.push({
+            eyeContact: centeredScore,
+            facialExpression: Math.round(positiveExpr * 100),
+            faceDetected: true
+          });
+        } else {
+          samplesRef.current.push({ eyeContact: 0, facialExpression: 0, faceDetected: false });
+        }
+      } catch (err) {
+        console.warn('⚠️ Face detection error:', err);
+        samplesRef.current.push({ eyeContact: 0, facialExpression: 0, faceDetected: false });
+      }
+    }, 800);
+  }, []);
+
+  const stopFaceSampling = useCallback(() => {
+    if (sampleIntervalRef.current) {
+      clearInterval(sampleIntervalRef.current);
+      sampleIntervalRef.current = null;
+    }
+  }, []);
+
+  function summarizeHeuristics() {
+    const samples = samplesRef.current;
+    if (!samples.length) {
+      return { eyeContactScore: 60, facialExpressionScore: 60, bodyLanguageScore: 60 };
+    }
+    const detected = samples.filter(s => s.faceDetected);
+    const detectionRate = detected.length / samples.length;
+    const avg = (key) =>
+      detected.length ? detected.reduce((a, s) => a + s[key], 0) / detected.length : 50;
+
+    return {
+      eyeContactScore: Math.round(avg('eyeContact')),
+      facialExpressionScore: Math.round(avg('facialExpression')),
+      bodyLanguageScore: Math.round(detectionRate * 100)
+    };
+  }
+
+  // ==================== RECORDING FUNCTIONS ====================
+  const startRecording = () => {
+    if (!streamRef.current) {
+      console.error('❌ No stream available');
+      setError('Camera/Microphone not ready. Please refresh.');
+      return;
+    }
+
+    const videoTracks = streamRef.current.getVideoTracks();
+    const audioTracks = streamRef.current.getAudioTracks();
+    
+    if (videoTracks.length === 0) {
+      console.error('❌ No video track in stream');
+      setError('Camera not available. Please check permissions.');
+      return;
+    }
+
+    if (audioTracks.length === 0) {
+      console.error('❌ No audio track in stream');
+      setError('Microphone not available. Please check permissions.');
+      return;
+    }
+
+    if (videoTracks[0].readyState === 'ended') {
+      console.error('❌ Video track has ended');
+      setError('Camera stream was closed. Please refresh and try again.');
+      return;
+    }
+
+    if (audioTracks[0].readyState === 'ended') {
+      console.error('❌ Audio track has ended');
+      setError('Microphone stream was closed. Please refresh and try again.');
+      return;
+    }
+
+    chunksRef.current = [];
+
+    const mimeTypes = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=h264,opus',
+      'video/webm',
+      'video/mp4'
+    ];
+
+    let selectedMimeType = null;
+    for (const mimeType of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(mimeType)) {
+        selectedMimeType = mimeType;
+        break;
+      }
+    }
+
+    if (!selectedMimeType) {
+      console.error('❌ No supported MIME type found');
+      setError('Your browser does not support video recording. Please use Chrome or Firefox.');
+      return;
+    }
+
+    console.log(`✅ Using MIME type: ${selectedMimeType}`);
+
+    try {
+      const recorder = new MediaRecorder(streamRef.current, {
+        mimeType: selectedMimeType,
+        videoBitsPerSecond: 2500000,
+        audioBitsPerSecond: 128000
+      });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onerror = (event) => {
+        console.error('❌ MediaRecorder error:', event);
+        setError('Recording error occurred. Please try again.');
+        setIsRecording(false);
+      };
+
+      recorder.start(1000);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      
+      startFaceSampling();
+
+      const suggested = interview?.questions[currentIndex]?.suggestedTimeSeconds || 120;
+      setTimeLeft(suggested);
+      
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            stopRecording();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+    } catch (err) {
+      console.error('❌ Recording start error:', err);
+      setError(`Recording error: ${err.message || 'Unknown error'}`);
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current) {
+      console.warn('⚠️ No media recorder to stop');
+      setIsRecording(false);
+      return;
+    }
+
+    if (mediaRecorderRef.current.state === 'inactive') {
+      console.warn('⚠️ Media recorder already inactive');
+      setIsRecording(false);
+      return;
+    }
+
+    clearInterval(timerRef.current);
+    stopFaceSampling();
+    setIsRecording(false);
+
+    const heuristics = summarizeHeuristics();
+    const idx = currentIndex;
+
+    mediaRecorderRef.current.onstop = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const blob = new Blob(chunksRef.current, { 
+          type: mediaRecorderRef.current.mimeType || 'video/webm' 
+        });
+        
+        if (blob.size === 0) {
+          console.warn('⚠️ No data recorded');
+          setError('No video data was recorded. Please try again.');
+          return;
+        }
+        
+        console.log(`📹 Recording size: ${(blob.size / 1024).toFixed(2)} KB`);
+        await submitAnswer(blob, idx, heuristics);
+      } catch (err) {
+        console.error('❌ Submit answer error:', err);
+        setError('Failed to submit answer. Please try again.');
+      }
+    };
+
+    try {
+      mediaRecorderRef.current.stop();
+    } catch (err) {
+      console.error('❌ Stop recording error:', err);
+      setError('Failed to stop recording.');
+    }
+  };
+
+  const submitAnswer = async (blob, idx, heuristics) => {
+    setAnalyzingCount(c => c + 1);
+    try {
+      const formData = new FormData();
+      formData.append('video', blob, `answer-${idx}.webm`);
+      formData.append('questionIndex', String(idx));
+      formData.append('clientHeuristics', JSON.stringify(heuristics));
+
+      const res = await fetch(`${API_BASE}/api/mock-interview/${interview._id}/analyze-answer`, {
+        method: 'POST',
+        body: formData
+      });
+      const json = await res.json();
+      if (json.success) {
+        setQuestionResults(prev => [...prev, json.data]);
+      } else {
+        console.error('❌ Analysis failed:', json.message);
+      }
+    } catch (err) {
+      console.error('❌ Answer analysis failed:', err);
+    } finally {
+      setAnalyzingCount(c => Math.max(0, c - 1));
+    }
+  };
+
+  // ==================== NAVIGATION - FIXED ====================
+  const advanceOrFinish = async () => {
+    const isLast = currentIndex >= interview.questions.length - 1;
+    if (isLast) {
+      setStep('submitting');
+      
+      // FIX: Use ref instead of state to avoid stale closure
+      const waitForAnalysis = () =>
+        new Promise(resolve => {
+          const check = () => {
+            if (analyzingCountRef.current === 0) resolve();
+            else setTimeout(check, 400);
+          };
+          check();
+        });
+      await waitForAnalysis();
+
+      try {
+        const res = await fetch(`${API_BASE}/api/mock-interview/${interview._id}/finish`, {
+          method: 'POST'
+        });
+        const json = await res.json();
+        if (json.success) {
+          setFinalReport(json.data);
+        } else {
+          setError('Could not generate your final report.');
+        }
+      } catch (err) {
+        console.error(err);
+        setError('Could not generate your final report.');
+      }
+      setStep('results');
+    } else {
+      setCurrentIndex(i => i + 1);
+    }
+  };
+
+  const handleNextQuestion = () => {
+    advanceOrFinish();
+  };
+
+  const handleSkipQuestion = () => {
+    if (isRecording) stopRecording();
+    advanceOrFinish();
+  };
 
   const handleBeginInterview = async () => {
     try {
       setError('');
       const finalRole = getFinalJobRole();
+      if (!finalRole) {
+        setError('Please select or enter a job title.');
+        return;
+      }
+      
+      console.log('🚀 Starting interview for:', finalRole);
       const res = await fetch(`${API_BASE}/api/mock-interview/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +602,7 @@ const MockInterview = ({ userEmail }) => {
       setQuestionResults([]);
       setStep('interview');
     } catch (err) {
-      console.error(err);
+      console.error('❌ Interview setup error:', err);
       setError('Could not start the interview. Please try again.');
     }
   };
@@ -112,6 +617,7 @@ const MockInterview = ({ userEmail }) => {
           onSubmit={handleStartSetup}
           error={error}
           jobRoles={JOB_ROLES}
+          suggested={suggested}
         />
       )}
 
@@ -159,7 +665,8 @@ const MockInterview = ({ userEmail }) => {
   );
 };
 
-function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
+// ==================== UPDATED SETUP SCREEN WITH SUGGESTED ROLE ====================
+function SetupScreen({ form, onChange, onSubmit, error, jobRoles, suggested }) {
   const isOther = form.jobRole === 'Other';
 
   return (
@@ -167,17 +674,23 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
       <div className="inline-block bg-indigo-600/20 text-indigo-600 text-xs font-bold tracking-wider uppercase px-3 py-1 rounded-full mb-4">
         Mock Interview
       </div>
-      <h1 className="text-2xl font-bold mb-2">Practice like it's the real thing</h1>
-      <p className="text-gray-400 text-sm mb-6">
+      <h1 className="text-2xl font-bold mb-2 text-black">Practice like it's the real thing</h1>
+      <p className="text-gray-500 text-sm mb-6">
         Set up your session — AI will tailor questions to the role and grade your delivery on camera.
       </p>
 
+      {suggested && (
+        <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm px-4 py-3 rounded-xl mb-4">
+          📌 আপনার <b>{suggested.companyName}</b>-এ <b>{suggested.jobRole}</b> ইন্টারভিউ {suggested.daysLeft} দিন পরে —
+          এই role অনুযায়ী প্রশ্ন সাজানো হয়েছে। চাইলে নিচে থেকে পরিবর্তন করতে পারেন।
+        </div>
+      )}
+
       <form onSubmit={onSubmit} className="space-y-4">
-        {/* Job Role - Dropdown */}
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Job Role</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">Job Role</label>
           <select
-            className="w-full bg-white border border-gray-700 rounded-xl px-4 py-3 text-sm text-black cursor-pointer focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/30 transition"
+            className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm text-black cursor-pointer focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/30 transition"
             value={form.jobRole}
             onChange={e => onChange('jobRole', e.target.value)}
           >
@@ -190,11 +703,11 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
 
         {isOther && (
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Enter Your Role</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Enter Your Role</label>
             <input
               type="text"
               placeholder="e.g. Blockchain Developer"
-              className="w-full bg-white border border-gray-700 rounded-xl px-4 py-3 text-sm text-black placeholder:text-gray-500 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/30 transition"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm text-black placeholder:text-gray-500 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/30 transition"
               value={form.customJobRole}
               onChange={e => onChange('customJobRole', e.target.value)}
             />
@@ -203,9 +716,9 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Experience Level</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Experience Level</label>
             <select
-              className="w-full bg-white border border-gray-700 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
               value={form.experienceLevel}
               onChange={e => onChange('experienceLevel', e.target.value)}
             >
@@ -213,9 +726,9 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Interview Type</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Interview Type</label>
             <select
-              className="w-full bg-white border border-gray-700 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
               value={form.interviewType}
               onChange={e => onChange('interviewType', e.target.value)}
             >
@@ -226,9 +739,9 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Difficulty</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Difficulty</label>
             <select
-              className="w-full bg-white border border-gray-700 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
               value={form.difficulty}
               onChange={e => onChange('difficulty', e.target.value)}
             >
@@ -236,12 +749,12 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Number of Questions</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Number of Questions</label>
             <input
               type="number"
               min="3"
               max="12"
-              className="w-full bg-white border border-gray-700 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm text-black focus:outline-none focus:border-indigo-600"
               value={form.questionCount}
               onChange={e => onChange('questionCount', e.target.value)}
             />
@@ -249,7 +762,7 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
         </div>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm px-4 py-3 rounded-xl">
+          <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
             {error}
           </div>
         )}
@@ -268,18 +781,18 @@ function SetupScreen({ form, onChange, onSubmit, error, jobRoles }) {
 // ==================== PERMISSIONS SCREEN ====================
 function PermissionsScreen({ videoRef, canvasRef, mediaReady, modelsReady, micLevel, brightnessWarning, error, onBegin }) {
   return (
-    <div className="max-w-2xl mx-auto bg-white  border border-gray-300 rounded-2xl p-8 shadow-xl">
-      <div className="inline-block bg-indigo-600/20 text-indigo-400 text-xs font-semibold tracking-wider uppercase px-3 py-1 rounded-full mb-4">
+    <div className="max-w-2xl mx-auto bg-white border border-gray-300 rounded-2xl p-8 shadow-xl">
+      <div className="inline-block bg-indigo-600/20 text-indigo-600 text-xs font-semibold tracking-wider uppercase px-3 py-1 rounded-full mb-4">
         Step 2 of 3
       </div>
-      <h1 className="text-2xl font-bold mb-2">Camera &amp; mic check</h1>
-      <p className="text-gray-400 text-sm mb-6">
+      <h1 className="text-2xl font-bold mb-2 text-black">Camera &amp; mic check</h1>
+      <p className="text-gray-500 text-sm mb-6">
         Make sure you're well-lit and your voice registers clearly before we begin.
       </p>
 
       <div className="flex justify-center mb-6">
         <div className={`relative rounded-2xl p-1 transition-all ${
-          mediaReady ? 'bg-gradient-to-r from-indigo-600 to-purple-600 shadow-[0_0_30px_rgba(79,70,229,0.2)]' : 'bg-gray-700'
+          mediaReady ? 'bg-gradient-to-r from-indigo-600 to-purple-600 shadow-[0_0_30px_rgba(79,70,229,0.2)]' : 'bg-gray-300'
         }`}>
           <video
             ref={videoRef}
@@ -292,28 +805,28 @@ function PermissionsScreen({ videoRef, canvasRef, mediaReady, modelsReady, micLe
       </div>
 
       <div className="space-y-2.5 mb-5">
-        <div className={`flex items-center gap-2.5 text-sm ${mediaReady ? 'text-white' : 'text-gray-500'}`}>
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${mediaReady ? 'bg-emerald-500' : 'bg-gray-600'}`} />
+        <div className={`flex items-center gap-2.5 text-sm ${mediaReady ? 'text-black' : 'text-gray-400'}`}>
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${mediaReady ? 'bg-emerald-500' : 'bg-gray-400'}`} />
           Camera & microphone connected
         </div>
-        <div className={`flex items-center gap-2.5 text-sm ${modelsReady ? 'text-white' : 'text-gray-500'}`}>
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${modelsReady ? 'bg-emerald-500' : 'bg-gray-600'}`} />
+        <div className={`flex items-center gap-2.5 text-sm ${modelsReady ? 'text-black' : 'text-gray-400'}`}>
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${modelsReady ? 'bg-emerald-500' : 'bg-gray-400'}`} />
           AI analysis models loaded
         </div>
-        <div className={`flex items-center gap-2.5 text-sm ${!brightnessWarning && mediaReady ? 'text-white' : 'text-gray-500'}`}>
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${!brightnessWarning && mediaReady ? 'bg-emerald-500' : 'bg-gray-600'}`} />
-          {brightnessWarning ? 'Lighting looks low — face a light source' : 'Lighting looks good'}
+        <div className={`flex items-center gap-2.5 text-sm ${!brightnessWarning && mediaReady ? 'text-black' : 'text-gray-400'}`}>
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${!brightnessWarning && mediaReady ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+          {brightnessWarning ? '⚠️ Lighting looks low — face a light source' : '✅ Lighting looks good'}
         </div>
-        <div className="flex items-center gap-2.5 text-sm text-gray-400">
+        <div className="flex items-center gap-2.5 text-sm text-gray-500">
           <span>Mic level</span>
-          <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-indigo-500 transition-all duration-100" style={{ width: `${micLevel}%` }} />
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm px-4 py-3 rounded-xl mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">
           {error}
         </div>
       )}
@@ -356,7 +869,7 @@ function InterviewScreen({ videoRef, question, index, total, timeLeft, isRecordi
           <span className={`inline-block text-xs font-semibold tracking-wider uppercase px-2.5 py-1 rounded-full ${getTagColor(question.category)}`}>
             {question.category}
           </span>
-          <h2 className="text-xl md:text-2xl font-semibold mt-3 leading-relaxed">
+          <h2 className="text-xl md:text-2xl font-semibold mt-3 leading-relaxed text-white">
             {question.question}
           </h2>
           {analyzingCount > 0 && (
@@ -385,7 +898,7 @@ function InterviewScreen({ videoRef, question, index, total, timeLeft, isRecordi
               </div>
             )}
           </div>
-          <div className="font-mono text-2xl font-semibold tracking-wider">
+          <div className="font-mono text-2xl font-semibold tracking-wider text-white">
             {formatTime(timeLeft)}
           </div>
         </div>
@@ -456,7 +969,7 @@ function ResultsScreen({ report, questionResults, interview, error }) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-mono text-3xl font-bold">{scores?.overall ?? '—'}</span>
+            <span className="font-mono text-3xl font-bold text-white">{scores?.overall ?? '—'}</span>
             <span className="text-xs text-gray-500">/ 100</span>
           </div>
         </div>
@@ -473,7 +986,7 @@ function ResultsScreen({ report, questionResults, interview, error }) {
 
       {scores && (
         <div className="bg-[#141414] border border-gray-800 rounded-2xl p-8 shadow-xl">
-          <h3 className="text-lg font-semibold mb-4">Score Breakdown</h3>
+          <h3 className="text-lg font-semibold mb-4 text-white">Score Breakdown</h3>
           <div className="space-y-3">
             {categories.map(c => (
               <div key={c.label} className="grid grid-cols-[130px_1fr_32px] items-center gap-2.5">
@@ -509,7 +1022,7 @@ function ResultsScreen({ report, questionResults, interview, error }) {
       )}
 
       <div className="bg-[#141414] border border-gray-800 rounded-2xl p-8 shadow-xl">
-        <h3 className="text-lg font-semibold mb-4">Question-by-question</h3>
+        <h3 className="text-lg font-semibold mb-4 text-white">Question-by-question</h3>
         {questionResults.map((qr, i) => (
           <div key={i} className="border-t border-gray-800 py-4 first:border-0 relative">
             <p className="font-semibold text-sm pr-16 mb-1 text-white">Q{i + 1}: {qr.question}</p>
