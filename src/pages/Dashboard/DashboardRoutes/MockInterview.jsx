@@ -438,8 +438,8 @@ useEffect(() => {
       
       startFaceSampling();
 
-      const suggested = interview?.questions[currentIndex]?.suggestedTimeSeconds || 120;
-      setTimeLeft(suggested);
+      const suggested = interview?.questions[currentIndex]?.suggestedTimeSeconds || 40;
+      setTimeLeft(Math.min(suggested, 40)); 
       
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
@@ -479,27 +479,25 @@ useEffect(() => {
     const heuristics = summarizeHeuristics();
     const idx = currentIndex;
 
-    mediaRecorderRef.current.onstop = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const blob = new Blob(chunksRef.current, { 
-          type: mediaRecorderRef.current.mimeType || 'video/webm' 
-        });
-        
-        if (blob.size === 0) {
-          console.warn('⚠️ No data recorded');
-          setError('No video data was recorded. Please try again.');
-          return;
-        }
-        
-        console.log(`📹 Recording size: ${(blob.size / 1024).toFixed(2)} KB`);
-        await submitAnswer(blob, idx, heuristics);
-      } catch (err) {
-        console.error('❌ Submit answer error:', err);
-        setError('Failed to submit answer. Please try again.');
-      }
-    };
+mediaRecorderRef.current.onstop = async () => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const blob = new Blob(chunksRef.current, {
+      type: mediaRecorderRef.current.mimeType || 'video/webm'
+    });
+
+    if (blob.size === 0) {
+      setError('No video data was recorded. Please try again.');
+      return;
+    }
+
+    submitAnswer(blob, idx, heuristics); 
+    advanceOrFinish(); 
+  } catch (err) {
+    console.error('❌ Submit answer error:', err);
+    setError('Failed to submit answer. Please try again.');
+  }
+};
 
     try {
       mediaRecorderRef.current.stop();
@@ -571,14 +569,21 @@ useEffect(() => {
     }
   };
 
-  const handleNextQuestion = () => {
+const handleNextQuestion = () => {
+  if (isRecording) {
+    stopRecording(); 
+  } else {
     advanceOrFinish();
-  };
+  }
+};
 
-  const handleSkipQuestion = () => {
-    if (isRecording) stopRecording();
+const handleSkipQuestion = () => {
+  if (isRecording) {
+    stopRecording(); 
+  } else {
     advanceOrFinish();
-  };
+  }
+};
 
   const handleBeginInterview = async () => {
     try {
